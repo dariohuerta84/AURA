@@ -65,18 +65,10 @@ function encuadrar(objeto: THREE.Object3D, alturaDeseada = 2) {
 }
 
 function ModeloGLB({ url }: { url: string }) {
+  // Convex storage sirve el .glb sin extension en la URL, y GLTFLoader elige
+  // el parser por extension. El fragmento #avatar.glb se lo indica sin
+  // alterar la peticion (el navegador no manda el fragmento).
   let targetUrl = url;
-  if (targetUrl && typeof window !== "undefined") {
-    if (targetUrl.includes("127.0.0.1:3212") || targetUrl.includes("localhost:3212")) {
-      targetUrl = targetUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
-    }
-  }
-
-  if (targetUrl && targetUrl.includes("loca.lt") && !targetUrl.includes("bypass-tunnel-reminder")) {
-    targetUrl += (targetUrl.includes("?") ? "&" : "?") + "bypass-tunnel-reminder=true";
-  }
-
-  // Three.js GLTFLoader necesita saber que es un binario .glb por la extensión del URL
   if (targetUrl && !targetUrl.includes(".glb") && !targetUrl.includes(".gltf")) {
     targetUrl += "#avatar.glb";
   }

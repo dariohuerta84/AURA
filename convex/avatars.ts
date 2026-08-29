@@ -124,7 +124,7 @@ export const generateAvatar = internalAction({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Bypass-Tunnel-Remainder": "true",
+          "bypass-tunnel-reminder": "true",
           "User-Agent": "AuraConvex/1.0",
         },
         body: JSON.stringify({ image_url: photoUrl }),

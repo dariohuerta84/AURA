@@ -41,7 +41,6 @@ def get_triposr_python() -> str:
         return configurado
 
     for candidato in (
-        Path("/home/matias/miniconda3/envs/triposr/bin/python"),
         TRIPOSR_REPO_PATH / ".venv" / "Scripts" / "python.exe",   # Windows
         TRIPOSR_REPO_PATH / "venv" / "Scripts" / "python.exe",
         TRIPOSR_REPO_PATH / ".venv" / "bin" / "python",           # Linux / macOS

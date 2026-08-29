@@ -235,19 +235,11 @@ export default function OnboardingPage() {
   const uploadPhotoToConvex = async (blob: Blob) => {
     try {
       setIs3DGenerating(true);
-      let uploadUrl = await generateUploadUrl();
-      if (typeof window !== "undefined") {
-        if (uploadUrl.includes("127.0.0.1:3212") || uploadUrl.includes("localhost:3212")) {
-          uploadUrl = uploadUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
-        }
-      }
-      if (uploadUrl.includes("loca.lt") && !uploadUrl.includes("bypass-tunnel-reminder")) {
-        uploadUrl += (uploadUrl.includes("?") ? "&" : "?") + "bypass-tunnel-reminder=true";
-      }
+      const uploadUrl = await generateUploadUrl();
 
       const res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": "image/jpeg", "Bypass-Tunnel-Remainder": "true" },
+        headers: { "Content-Type": "image/jpeg" },
         body: blob,
       });
 
