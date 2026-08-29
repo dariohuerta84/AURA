@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --void: #0A0A1A;
+    --deep-purple: #1A0B2E;
+    --aura-violet: #7C3AED;
+    --aura-gold: #F59E0B;
+    --aura-cyan: #06B6D4;
+    --ghost-white: #F8F8FF;
+    --muted-lavender: #A78BFA;
+    --glass-bg: rgba(255, 255, 255, 0.07);
+    --glass-border: rgba(255, 255, 255, 0.12);
+  }
+
+  body {
+    background-color: var(--void);
+    color: var(--ghost-white);
+    font-family: var(--font-outfit), sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+}
+
+/* Custom Utilities for Glassmorphism & Glowing Auras */
+.glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card-active {
+  background: rgba(124, 58, 237, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid #7C3AED;
+  border-radius: 20px;
+  box-shadow: 0 0 25px rgba(124, 58, 237, 0.35);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  color: #F8F8FF;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Aura Orb Animations */
+@keyframes auraPulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 40px rgba(124, 58, 237, 0.4), inset 0 0 30px rgba(6, 182, 212, 0.3);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 70px rgba(124, 58, 237, 0.7), inset 0 0 50px rgba(245, 158, 11, 0.4);
+  }
+  100% {
+    transform: scale(0.96);
+    box-shadow: 0 0 40px rgba(124, 58, 237, 0.4), inset 0 0 30px rgba(6, 182, 212, 0.3);
+  }
+}
+
+@keyframes floatParticle {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-25px) rotate(180deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(0px) rotate(360deg);
+    opacity: 0.2;
+  }
+}
+
+.aura-orb-element {
+  animation: auraPulse 4s ease-in-out infinite;
+  border-radius: 50%;
+  position: relative;
+}
+
+.glow-button {
+  background: linear-gradient(135deg, #7C3AED 0%, #06B6D4 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+}
+
+.glow-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 30px rgba(124, 58, 237, 0.6);
+}
+
+.glow-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A1A;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(167, 139, 250, 0.3);
+  border-radius: 4px;
+}
