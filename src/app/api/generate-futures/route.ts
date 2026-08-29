@@ -43,7 +43,7 @@ Instrucciones de estilo:
   "brightFuture": "Escena 2: Si hoy decides sostener tu disciplina y dar el paso..."
 }`;
 
-    const response = await fetch(
+    let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`,
       {
         method: "POST",
@@ -57,6 +57,24 @@ Instrucciones de estilo:
         }),
       }
     );
+
+    if (!response.ok) {
+      // Fallback to gemini-1.5-flash if 2.5/3.6 endpoints vary
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.8,
+            },
+          }),
+        }
+      );
+    }
 
     if (!response.ok) {
       const errText = await response.text();
