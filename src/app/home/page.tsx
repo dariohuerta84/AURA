@@ -139,11 +139,27 @@ export default function HomePage() {
       const currentHabits = getStoredHabits(u.category);
       setHabits(currentHabits);
 
-      // Auto-regenerate with AI if habits are static default ones
+      // Auto-regenerate with AI if habits are static default ones or contain initial seed titles
+      const staticSeedKeywords = [
+        "meditar 5 minutos",
+        "escribir 3 cosas",
+        "leer 15 minutos",
+        "journaling",
+        "desconectar pantallas",
+        "tomar 2 litros",
+        "caminar 20 minutos",
+        "ejercicio activo",
+        "comer 1 comida",
+        "dormir entre 7 y 8",
+        "comer sin alimentos",
+      ];
+
       const isStaticDefault =
         currentHabits.length === 0 ||
         currentHabits.every((h) => h.isDefault === true) ||
-        currentHabits.some((h) => h.title.includes("Meditar 5 minutos en calma") || h.title.includes("Tomar 2 Litros de agua"));
+        currentHabits.some((h) =>
+          staticSeedKeywords.some((keyword) => h.title.toLowerCase().includes(keyword))
+        );
 
       if (isStaticDefault) {
         setIsGeneratingAiHabits(true);
