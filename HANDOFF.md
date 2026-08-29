@@ -1,118 +1,113 @@
-# Avatar 3D — Handoff para correr con GPU real (Convex + TripoSR)
+# AURA — Levantar el servicio GPU
 
-## Cómo funciona (importante entender esto primero)
-Convex vive en la nube — no tiene GPU y no puede correr TripoSR. Por eso la
-arquitectura tiene dos partes separadas:
+## Estado actual del proyecto
 
-1. **Convex** (`convex/`): maneja la subida de fotos, la base de datos, y el
-   estado del avatar. Corre en la nube, no en tu PC.
-2. **Servicio GPU** (`gpu_service/`): un servidor pequeño que SÍ corre en tu
-   PC (la que tiene la 3050) y ejecuta TripoSR de verdad. Convex le habla por
-   HTTP a través de un túnel (ngrok), porque tu PC no es alcanzable desde
-   internet directamente.
+Todo está hecho **menos esto**. Concretamente:
 
-Dale este archivo completo a tu IA (Claude Code) en tu terminal y pídele que
-siga los pasos en orden.
+- Convex ya está desplegado y funcionando (proyecto `aura`, deployment
+  `giddy-eagle-383`): base de datos, storage, scheduler y estado reactivo.
+  Verificado de punta a punta.
+- El frontend ya está conectado a Convex y sube fotos correctamente.
+- **Falta un único dato**: la URL del servicio con GPU. Sin ella, cada avatar
+  termina en `status: "error"` con el mensaje "Falta AVATAR_GPU_SERVICE_URL".
+  Eso NO es un bug: es el sistema diciendo que le falta el brazo ejecutor.
+
+Tu trabajo es solo levantar ese brazo. No toques `convex/` ni `frontend/`.
+
+## Por qué hace falta tu PC
+
+Convex corre en la nube y no tiene GPU, así que no puede ejecutar TripoSR.
+La generación 3D se delega a `gpu_service/`: un servidor FastAPI que corre en
+tu PC y que una acción de Convex invoca por HTTP. Como tu PC no es alcanzable
+desde internet, se expone con un túnel (ngrok).
+
+```
+navegador → Convex (BD + storage + scheduler) → ngrok → tu PC (TripoSR)
+```
 
 ## Pasos
 
-1. Clonar este repo y clonar TripoSR aparte dentro de `gpu_service/`:
+1. Clonar el repo y entrar a `gpu_service/`:
    ```bash
-   cd gpu_service
-   git clone https://github.com/VAST-AI-Research/TripoSR
-   cd TripoSR
-   pip install --upgrade setuptools
-   pip install -r requirements.txt
-   cd ..
-   pip install -r requirements.txt
+   git clone https://github.com/dariohuerta84/AURA
+   cd AURA/gpu_service
    ```
 
-2. Levantar el servicio GPU local:
+2. Clonar TripoSR DENTRO de `gpu_service/`, con su propio venv de Python 3.10
+   (torch y torchmcubes no tienen ruedas para 3.13+):
    ```bash
+   git clone https://github.com/VAST-AI-Research/TripoSR
+   cd TripoSR
+   python3.10 -m venv .venv
+   .venv/Scripts/python.exe -m pip install --upgrade setuptools
+   .venv/Scripts/python.exe -m pip install -r requirements.txt
+   ```
+
+3. **Antes que nada**, correr TripoSR a mano una vez:
+   ```bash
+   .venv/Scripts/python.exe run.py examples/chair.png --output-dir output/ --device cuda
+   ```
+   La primera ejecución descarga ~1.4GB de pesos desde Hugging Face. Hay que
+   dejarlos cacheados AHORA: si esa descarga ocurre dentro de una petición
+   real, la acción de Convex se corta por tiempo y el error que aparece no
+   tiene ninguna relación con la causa.
+
+4. Instalar las dependencias del worker y levantarlo:
+   ```bash
+   cd ..
+   pip install -r requirements.txt
    uvicorn server:app --host 0.0.0.0 --port 8000
    ```
 
-3. Exponerlo a internet con ngrok (en otra terminal):
+5. Exponerlo con ngrok, en otra terminal:
    ```bash
    ngrok http 8000
    ```
-   Copia la URL `https://xxxx.ngrok-free.app` que te da.
+   Pasar la URL `https://xxxx.ngrok-free.app` a quien administra Convex.
 
-4. Configurar Convex con esa URL:
+6. Esa persona corre, desde la raíz del proyecto:
    ```bash
-   cd ../..   # volver a la raíz del proyecto
-   npx convex dev
    npx convex env set AVATAR_GPU_SERVICE_URL https://xxxx.ngrok-free.app
    ```
+   No hace falta reiniciar ni recompilar nada.
 
-5. Levantar el frontend:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+## Trampas conocidas
 
-6. Abrir la app, subir una foto de cuerpo completo, y esperar. La primera
-   vez TripoSR descarga ~1.4GB de pesos desde Hugging Face — es normal que
-   tarde más en la primera generación.
+**`server.py` llama a `python` a secas.** En el paso 4, `subprocess.run` usa
+el `python` del PATH, que NO es el venv de TripoSR. Si sale
+`ModuleNotFoundError: torch`, esa es la causa exacta. Dos salidas: activar el
+venv de TripoSR antes de lanzar `uvicorn`, o cambiar esa lista en `server.py`
+por la ruta absoluta al python de ese venv (más robusto).
 
-## Si la 3050 da "CUDA out of memory"
-Es la variante de 4GB (laptop). En `gpu_service/server.py`, baja
-`--mc-resolution` de 384 a 256, y si sigue fallando agrega
-`--chunk-size 4096` a la llamada de TripoSR.
+**La URL de ngrok cambia en cada reinicio.** En el plan gratis es aleatoria.
+Cada vez que reinicies ngrok hay que repetir el paso 6, o los avatares se
+quedan colgados sin explicación aparente.
 
-## Para detener todo
-`Ctrl+C` en las tres terminales (servicio GPU, ngrok, frontend). Convex sigue
-corriendo en la nube — no hace falta apagarlo.
+**El puerto 8000.** Si en tu PC ya hay algo escuchando ahí, usa `--port 8010`
+y `ngrok http 8010`.
 
----
+**`CUDA out of memory`.** En `server.py`, baja `--mc-resolution` de 384 a 256.
+Si sigue, agrega `--chunk-size 4096` a la llamada de TripoSR.
 
-# Notas de la integración (agregadas al organizar el repo)
+## Verificar antes de entregar la URL
 
-Los archivos de arriba quedaron tal cual los escribiste. Estas son cosas que
-salieron al integrarlos y conviene tener a mano.
+Prueba el worker localmente con una foto de cuerpo completo y confirma que
+devuelve un `.glb` de verdad y no un JSON de error:
 
-## Paso 5 del frontend: falta activar el flujo Convex
+```bash
+curl -X POST http://127.0.0.1:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"image_url":"https://upload.wikimedia.org/wikipedia/commons/3/3c/Shaki_waterfall.jpg"}' \
+  -o prueba.glb -w "%{http_code} %{size_download} bytes\n"
+```
 
-`npm run dev` levanta el frontend con el **flujo Django** (`UploadAvatar.jsx`),
-que es el que funciona hoy. `UploadAvatarConvex.jsx` esta en
-`frontend/src/` pero todavia no esta conectado, a proposito: importa
-`../../convex/_generated/api`, que no existe hasta correr `npx convex dev`.
-Si se conectara antes, se romperia el build entero.
+Un `.glb` válido pesa cientos de KB o más. Si pesa 200 bytes, es un error en
+JSON, ábrelo y lee el mensaje.
 
-Despues del paso 4 (`npx convex dev`), para activarlo:
+## Si TripoSR decepciona
 
-1. En `frontend/src/main.jsx`, descomentar las dos lineas indicadas y envolver
-   `<App />` en `<ConvexProvider client={convex}>`.
-2. En `frontend/src/App.jsx`, cambiar `UploadAvatar` por `UploadAvatarConvex`.
-3. Poner `VITE_CONVEX_URL` en `frontend/.env.local` (la URL que imprime
-   `npx convex dev`).
-
-## Choque de puertos en el paso 2
-
-`uvicorn --port 8000` es el mismo puerto que usa el backend Django de este
-repo. En la PC de la GPU no importa (ahi Django no corre). Si alguna vez
-levantas los dos en la misma maquina, cambia uno: `--port 8010`.
-
-## `python` a secas en server.py
-
-`server.py` llama a `subprocess.run(["python", "run.py", ...])`. Eso usa el
-`python` que este primero en el PATH, que NO es el venv de TripoSR salvo que
-lo actives antes de levantar uvicorn. Si da `ModuleNotFoundError: torch`,
-esa es la causa: o activas el venv de TripoSR antes de `uvicorn`, o cambias
-esa lista por la ruta absoluta al python del venv. (En `backend/avatar3d/
-generate_avatar.py` este mismo problema ya esta resuelto con la variable
-`TRIPOSR_PYTHON`, por si quieres copiar el enfoque.)
-
-## Dos caminos al mismo visor
-
-El repo tiene ahora dos backends que hacen lo mismo por vias distintas:
-
-- **Django** (`backend/`): sincrono, la foto va y vuelve en la misma request.
-  Funciona hoy, con modo mock incluido para probar sin GPU.
-- **Convex + gpu_service**: asincrono y reactivo, la foto se sube a Convex
-  storage y el estado se actualiza solo. Necesita login de Convex, la PC con
-  la 3050 y ngrok.
-
-Los dos terminan alimentando el mismo `AvatarViewer.jsx`. No se estorban:
-puedes dejar los dos y elegir cual conectas en `App.jsx`.
+TripoSR está entrenado sobre todo con objetos, no personas: con una foto de
+cuerpo completo suele dar un bulto humanoide con la cara borrosa. Si el
+resultado no sirve, el cambio es contenido — se reemplaza el modelo dentro de
+`server.py` por TRELLIS o Hunyuan3D-2, que dan mucha mejor calidad. La
+arquitectura (Convex, storage, estado, visor) no cambia en nada.
