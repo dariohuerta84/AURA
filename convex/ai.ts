@@ -19,13 +19,70 @@ export const generateTwoFutures = action({
 
     const completedHabitsCount = todayCheckIns.filter((c) => c.completed).length;
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const openCodeKey = process.env.OPENCODE_API_KEY;
     const googleApiKey = process.env.GOOGLE_API_KEY;
 
     let darkFutureText = "";
     let brightFutureText = "";
 
-    // 1. Try Google Gemini API if GOOGLE_API_KEY is provided
+    // 1. Try OpenCode (MiMo V2.5 Free) first
+    if (openCodeKey && !darkFutureText) {
+      try {
+        const prompt = `Eres un narrador empático, profundo e hiper-honesto para la app AURA.
+Tu misión es generar DOS proyecciones cortas del futuro (máximo 75 palabras cada una) en segunda persona ("tú").
+
+DATOS DEL USUARIO:
+- Nombre: ${user.name}
+- Meta personal: "${user.goal}"
+- Categoría: ${user.category}
+- Nivel de estrés: ${user.stressLevel || "desconocido"}/5
+- Fuente principal de ansiedad: ${user.anxietySource || "general"}
+- Calidad de sueño: ${user.sleepQuality || "irregular"}
+- Nivel de actividad: ${user.activityLevel || "moderada"}
+- Hábitos completados hoy: ${completedHabitsCount} de ${habits.length}
+- Racha actual: ${user.currentStreak} días
+
+Instrucciones de estilo:
+- Directo, visceral y realista. Nada de frases motivacionales genéricas.
+- Usa los datos exactos del usuario (su meta, su fuente de ansiedad o sueño).
+- Respuesta obligatoria en formato JSON exacto:
+{
+  "darkFuture": "Escena 1: Si sigues ignorando tu patrón y postergando...",
+  "brightFuture": "Escena 2: Si hoy decides sostener tu aura y dar el paso..."
+}`;
+
+        const res = await fetch(
+          `${process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1"}/chat/completions`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openCodeKey}`,
+            },
+            body: JSON.stringify({
+              model: process.env.OPENCODE_MODEL || "mimo-v2.5-free",
+              messages: [{ role: "user", content: prompt }],
+              response_format: { type: "json_object" },
+              temperature: 0.8,
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          const jsonText = data.choices?.[0]?.message?.content;
+          if (jsonText) {
+            const parsed = JSON.parse(jsonText);
+            darkFutureText = parsed.darkFuture || "";
+            brightFutureText = parsed.brightFuture || "";
+          }
+        }
+      } catch (e) {
+        console.error("OpenCode API call failed", e);
+      }
+    }
+
+    // 2. Try Google Gemini API as fallback
     if (googleApiKey && !darkFutureText) {
       try {
         const prompt = `Eres un narrador empático, profundo e hiper-honesto para la app AURA.
@@ -71,51 +128,6 @@ Responde EXCLUSIVAMENTE con un JSON válido con este formato:
         }
       } catch (e) {
         console.error("Google Gemini API call failed", e);
-      }
-    }
-
-    // 2. Try OpenAI API if OPENAI_API_KEY is provided
-    if (apiKey && !darkFutureText) {
-      try {
-        const OpenAI = (await import("openai")).default;
-        const openai = new OpenAI({ apiKey });
-
-        const systemPrompt = `Eres un narrador empático, profundo e hiper-honesto para la app AURA.
-Tu misión es generar DOS proyecciones cortas del futuro (máximo 75 palabras cada una) en segunda persona ("tú").
-
-DATOS DEL USUARIO:
-- Nombre: ${user.name}
-- Meta personal: "${user.goal}"
-- Categoría: ${user.category}
-- Nivel de estrés: ${user.stressLevel || "desconocido"}/5
-- Fuente principal de ansiedad: ${user.anxietySource || "general"}
-- Calidad de sueño: ${user.sleepQuality || "irregular"}
-- Nivel de actividad: ${user.activityLevel || "moderada"}
-- Hábitos completados hoy: ${completedHabitsCount} de ${habits.length}
-- Racha actual: ${user.currentStreak} días
-
-Instrucciones de estilo:
-- Directo, visceral y realista. Nada de frases motivacionales genéricas.
-- Usa los datos exactos del usuario (su meta, su fuente de ansiedad o sueño).
-- Respuesta obligatoria en formato JSON exacto:
-{
-  "darkFuture": "Escena 1: Si sigues ignorando tu patrón y postergando...",
-  "brightFuture": "Escena 2: Si hoy decides sostener tu aura y dar el paso..."
-}`;
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [{ role: "system", content: systemPrompt }],
-          response_format: { type: "json_object" },
-          temperature: 0.8,
-        });
-
-        const content = completion.choices[0]?.message?.content || "{}";
-        const parsed = JSON.parse(content);
-        darkFutureText = parsed.darkFuture || "";
-        brightFutureText = parsed.brightFuture || "";
-      } catch (e) {
-        console.error("OpenAI API call failed, using fallback generator", e);
       }
     }
 
