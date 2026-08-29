@@ -80,6 +80,14 @@ function ModeloGLB({ url }: { url: string }) {
   return <primitive object={listo} />;
 }
 
+function Cargando() {
+  return (
+    <Html center style={{ color: "#0ea5e9", fontSize: 12, fontWeight: "600", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
+      SINTETIZANDO 3D...
+    </Html>
+  );
+}
+
 export default function AvatarViewer({ avatarUrl, theme = "equilibrio" }: { avatarUrl?: string; theme?: string }) {
   if (!avatarUrl) return null;
 
