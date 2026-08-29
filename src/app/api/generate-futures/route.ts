@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         const prompt = `Eres el motor de Inteligencia Artificial de la aplicación AURA (basada en psicología del comportamiento).
 Tu objetivo es analizar la meta personal del usuario y su evaluación actual, y generar:
 1. DOS proyecciones narrativas futuristas cortas (máximo 65 palabras cada una) en segunda persona ("tú").
-2. CINCO micro-hábitos atómicos y súper concretos diseñados para alcanzar su meta específica: "${user.goal}".
+2. CINCO micro-hábitos atómicos y súper concretos diseñados para ayudarle a alcanzar su meta específica: "${user.goal}".
 
 DATOS DEL USUARIO:
 - Nombre: ${user.name}
@@ -44,15 +44,23 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
   ]
 }`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-        });
-
-        const rawText = response.text?.trim();
+        let rawText = "";
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: prompt,
+          });
+          rawText = response.text?.trim() || "";
+        } catch (mErr) {
+          console.warn("Primary model error, retrying fallback model", mErr);
+          const fallbackResponse = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: prompt,
+          });
+          rawText = fallbackResponse.text?.trim() || "";
+        }
 
         if (rawText) {
-          // Clean JSON markdown if wrapped in ```json
           const cleanedText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
           const parsed = JSON.parse(cleanedText);
 
@@ -69,7 +77,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
       }
     }
 
-    // Dynamic tailored fallback if API experiences temporary high demand (503)
+    // Dynamic fallback matching user goal
     const isMental = user.category === "salud_mental";
     const darkText = isMental
       ? `En noventa días, ${user.name}, la constante postergación de tus momentos de pausa hace que la tensión del día se acumule. La meta de "${user.goal}" se percibe cada vez más distante si no estableces tus límites hoy.`

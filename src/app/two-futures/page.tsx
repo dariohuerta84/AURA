@@ -89,6 +89,10 @@ export default function TwoFuturesPage() {
 
   const handleRegenerate = () => {
     if (user) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("aura_two_futures");
+      }
+      setFutures(null);
       fetchFuturesFromAI(user);
     }
   };
