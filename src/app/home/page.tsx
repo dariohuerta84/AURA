@@ -19,7 +19,35 @@ export default function HomePage() {
     const u = getStoredUser();
     if (u && u.name) {
       setUser(u);
-      setHabits(getStoredHabits(u.category));
+      const currentHabits = getStoredHabits(u.category);
+      setHabits(currentHabits);
+
+      // Auto-regenerate with AI if habits are still the default static ones
+      const allDefault = currentHabits.every((h) => h.isDefault === true);
+      if (allDefault) {
+        fetch("/api/generate-futures", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: u, habitsCount: 5 }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
+              const aiHabits: Habit[] = data.habits.map((h: any, i: number) => ({
+                id: `ai_${Date.now()}_${i}`,
+                title: h.title || "",
+                category: u.category,
+                isDefault: false,
+                difficulty: h.difficulty || "normal",
+                auraPoints: h.auraPoints || 8,
+                completedToday: false,
+              }));
+              setHabits(aiHabits);
+              saveStoredHabits(aiHabits);
+            }
+          })
+          .catch(() => {/* silently keep default habits on error */});
+      }
     } else {
       router.replace("/onboarding");
     }
