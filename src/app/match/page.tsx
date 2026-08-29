@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Heart, X, Sparkles, Flame, MessageCircle, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
-import { getStoredUser, getStoredHabits, UserProfile, Habit } from "@/lib/store";
+import { Flame, X, Sparkles, MessageCircle, ShieldCheck } from "lucide-react";
+import { getStoredUser, getCommunityCandidates, CommunityCandidate, UserProfile } from "@/lib/store";
 import { BottomNav } from "@/components/BottomNav";
 import confetti from "canvas-confetti";
 
@@ -116,8 +116,9 @@ function EsferaAura({ nombre, colorFrom, colorTo, size = 96 }: { nombre: string;
 export default function HabitMatchPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [candidates, setCandidates] = useState<CommunityCandidate[]>([]);
   const [index, setIndex] = useState<number>(0);
-  const [matchedCandidate, setMatchedCandidate] = useState<MatchCandidate | null>(null);
+  const [matchedCandidate, setMatchedCandidate] = useState<CommunityCandidate | null>(null);
   const [sentMessage, setSentMessage] = useState<string>("");
   const [messageSentSuccess, setMessageSentSuccess] = useState(false);
 
@@ -125,25 +126,28 @@ export default function HabitMatchPage() {
     const user = getStoredUser();
     if (user && user.name) {
       setCurrentUser(user);
+      // Load real community candidates, prioritizing user's category
+      const all = getCommunityCandidates();
+      // Filter out own profile
+      const others = all.filter((c) => c.nombre !== user.name && c.id !== user.id);
+      const sameCat = others.filter((c) => c.categoryKey === user.category);
+      const diffCat = others.filter((c) => c.categoryKey !== user.category);
+      setCandidates([...sameCat, ...diffCat]);
     } else {
       router.replace("/onboarding");
     }
   }, [router]);
 
-  if (!currentUser) {
+  if (!currentUser || candidates.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6 text-white/50">
-        Cargando candidatos de tu comunidad...
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-white/50 min-h-screen">
+        <Sparkles className="w-8 h-8 text-purple-400 mb-3 animate-pulse" />
+        <p className="text-sm">Cargando tu comunidad de hábitos...</p>
       </div>
     );
   }
 
-  // Ordenar los candidatos priorizando la misma categoría del usuario
-  const filteredCandidates = COMMUNITY_CANDIDATES.filter(
-    (c) => c.categoryKey === currentUser.category
-  ).concat(COMMUNITY_CANDIDATES.filter((c) => c.categoryKey !== currentUser.category));
-
-  const actualCandidate = filteredCandidates[index % filteredCandidates.length];
+  const actualCandidate = candidates[index % candidates.length];
 
   const siguiente = () => {
     setIndex((i) => i + 1);
@@ -156,7 +160,7 @@ export default function HabitMatchPage() {
         particleCount: 80,
         spread: 90,
         origin: { y: 0.5 },
-        colors: ["#EC4899", "#8B5CF6", "#3B82F6"],
+        colors: ["#f97316", "#8B5CF6", "#fbbf24"],
       });
     } catch {
       // fallback
@@ -191,7 +195,7 @@ export default function HabitMatchPage() {
       <div className="flex items-center justify-between pb-3 border-b border-white/10 z-10">
         <div>
           <div className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-pink-400">
-            <Heart className="w-3 h-3 text-pink-400 fill-pink-400 animate-pulse" />
+            <Flame className="w-3 h-3 text-orange-400 fill-orange-400" />
             <span>Aura Habit Match</span>
           </div>
           <h1 className="text-base font-bold text-white tracking-wide">Comunidad de Hábitos</h1>
@@ -260,11 +264,11 @@ export default function HabitMatchPage() {
 
             <button
               onClick={darLike}
-              className="w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-[0_0_30px_rgba(236,72,153,0.6)] hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-tr from-pink-600 via-purple-600 to-cyan-400"
+              className="w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-[0_0_30px_rgba(249,115,22,0.6)] hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-tr from-amber-500 via-orange-500 to-purple-600"
               aria-label="Conectar Match"
               title="Hacer Match"
             >
-              <Heart className="w-7 h-7 text-white fill-white animate-pulse" />
+              <Flame className="w-7 h-7 text-white fill-white" />
             </button>
           </div>
         </div>
@@ -275,8 +279,8 @@ export default function HabitMatchPage() {
             <Sparkles className="w-8 h-8 text-pink-400" />
           </div>
 
-          <h2 className="text-3xl font-extrabold text-white tracking-tight drop-shadow-[0_0_25px_rgba(236,72,153,0.8)]">
-            ¡Es un Match de Aura!
+          <h2 className="text-3xl font-extrabold text-white tracking-tight drop-shadow-[0_0_25px_rgba(249,115,22,0.8)]">
+            ¡Conexión de Aura! 🔥
           </h2>
 
           <div className="my-5 flex items-center justify-center gap-4">
@@ -287,7 +291,7 @@ export default function HabitMatchPage() {
               colorTo="#3b82f6"
               size={76}
             />
-            <Heart className="w-6 h-6 text-pink-400 fill-pink-400 animate-pulse" />
+            <Flame className="w-6 h-6 text-orange-400 fill-orange-400 animate-pulse" />
             {/* Candidate Orb */}
             <EsferaAura
               nombre={matchedCandidate.nombre}

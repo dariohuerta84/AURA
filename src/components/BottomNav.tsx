@@ -3,14 +3,14 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Heart, Sparkles, User } from "lucide-react";
+import { Home, Flame, Sparkles, User } from "lucide-react";
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
 
   const navItems = [
     { href: "/home", label: "Inicio", icon: Home },
-    { href: "/match", label: "Aura Match", icon: Heart, highlight: true },
+    { href: "/match", label: "Aura Match", icon: Flame, highlight: true },
     { href: "/two-futures", label: "Dos Futuros", icon: Sparkles },
     { href: "/profile", label: "Perfil", icon: User },
   ];
@@ -31,7 +31,7 @@ export const BottomNav: React.FC = () => {
                   isActive ? "scale-110 ring-2 ring-white/80" : "hover:scale-105"
                 }`}
               >
-                <Icon className="w-5 h-5 text-white fill-white animate-pulse" />
+                <Icon className="w-5 h-5 text-white fill-white" />
                 <span className="sr-only">{item.label}</span>
               </Link>
             );

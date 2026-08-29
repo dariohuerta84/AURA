@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Check } from "lucide-react";
-import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile } from "@/lib/store";
+import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
 
@@ -256,6 +256,7 @@ export default function OnboardingPage() {
   // Animation State for Step 5 (Reveal)
   const [isGenerating, setIsGenerating] = useState(false);
   const [calculatedAura, setCalculatedAura] = useState(50);
+  const [aiHabits, setAiHabits] = useState<Habit[]>([]);
 
   // Select questions array based on category
   const activeQuestions =
@@ -299,11 +300,11 @@ export default function OnboardingPage() {
         createdAt: Date.now(),
       };
 
-      // Call Gemini API in background during reveal
+      // Call Gemini API in background during reveal — generates futures AND personalized habits
       fetch("/api/generate-futures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: tempUser, habitsCount: 5, completedHabitsCount: 0 }),
+        body: JSON.stringify({ user: tempUser, habitsCount: 5 }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -314,6 +315,19 @@ export default function OnboardingPage() {
               date: new Date().toISOString().split("T")[0],
               createdAt: Date.now(),
             });
+          }
+          // Save AI-generated personalized habits
+          if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
+            const generatedHabits: Habit[] = data.habits.map((h: any, i: number) => ({
+              id: `ai_${Date.now()}_${i}`,
+              title: h.title || "",
+              category,
+              isDefault: false,
+              difficulty: h.difficulty || "normal",
+              auraPoints: h.auraPoints || 8,
+              completedToday: false,
+            }));
+            setAiHabits(generatedHabits);
           }
         })
         .catch((err) => console.error("API call error during onboarding", err));
@@ -349,7 +363,9 @@ export default function OnboardingPage() {
     };
 
     saveStoredUser(userProfile);
-    saveStoredHabits(getStoredHabits(category));
+    // Use AI-generated habits if available, otherwise fall back to defaults
+    const habitsToSave = aiHabits.length > 0 ? aiHabits : getStoredHabits(category);
+    saveStoredHabits(habitsToSave);
 
     router.replace("/home");
   };
