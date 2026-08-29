@@ -38,17 +38,34 @@ PERSONAJE/
 └── visor-360/                el visor de fotos anterior (proyecto aparte)
 ```
 
-## Dos caminos hacia el mismo visor
+## Arquitectura: Convex es el backend
 
-- **A — Django** (`backend/`): sincrono, todo local, con modo mock para probar
-  sin GPU. Es lo que funciona hoy y lo que describe el resto de este README.
-- **B — Convex + servicio GPU** (`convex/` + `gpu_service/`): asincrono y
-  reactivo; la foto se sube a Convex storage y una accion agendada llama por
-  ngrok a la PC que tiene la GPU. Los pasos estan en **HANDOFF.md**.
+La app corre sobre **Convex** (proyecto `aura`, deployment `giddy-eagle-383`).
+Convex tiene:
 
-Ambos alimentan el mismo `AvatarViewer.jsx` y conviven sin estorbarse: eliges
-cual conectas en `frontend/src/App.jsx`. El camino B queda desconectado hasta
-que corras `npx convex dev` (ver HANDOFF.md).
+- la **base de datos** (tabla `avatars`, con el estado del job),
+- el **storage** de las fotos subidas y de los `.glb` generados,
+- la **orquestacion**: `createAvatarJob` inserta el registro y agenda con
+  `ctx.scheduler.runAfter` la accion que genera el avatar,
+- el **estado reactivo** que el frontend consume con `useQuery`, sin polling.
+
+TripoSR necesita GPU y Convex corre en la nube, asi que la generacion se
+delega a `gpu_service/`: un worker FastAPI que corre en una PC con GPU y que
+una accion de Convex invoca por HTTP. Es el patron normal para trabajo pesado:
+Convex sigue siendo el backend, el worker es solo un brazo ejecutor.
+
+```
+navegador → Convex (BD + storage + scheduler) → gpu_service (GPU) → TripoSR
+     ↑__________ estado reactivo (useQuery) __________|
+```
+
+### Sobre `backend/` (Django)
+
+Fue la primera version, sincrona y local, antes de mover el backend a Convex.
+**Ya no esta conectada al frontend** y no hace falta para correr la app; se
+queda en el repo como referencia y como banco de pruebas offline (tiene un
+modo mock que genera un avatar de juguete sin GPU). Lo que sigue de este
+README describe ese camino.
 
 `backend/avatar3d/` es autonomo: cuando quieras, copias esa carpeta a GAVI-CRM,
 la agregas a `INSTALLED_APPS` y sumas `path("", include("avatar3d.urls"))` a tu
