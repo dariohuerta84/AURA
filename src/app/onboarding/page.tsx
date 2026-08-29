@@ -385,23 +385,23 @@ export default function OnboardingPage() {
               completedToday: false,
             }));
             setAiHabits(generatedHabits);
+            saveStoredHabits(generatedHabits);
           }
         })
-        .catch((err) => console.error("API call error during onboarding", err));
-
-      setTimeout(() => {
-        setIsGenerating(false);
-        try {
-          confetti({
-            particleCount: 75,
-            spread: 80,
-            origin: { y: 0.6 },
-            colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
-          });
-        } catch {
-          // fallback
-        }
-      }, 2400);
+        .catch((err) => console.error("API call error during onboarding", err))
+        .finally(() => {
+          setIsGenerating(false);
+          try {
+            confetti({
+              particleCount: 75,
+              spread: 80,
+              origin: { y: 0.6 },
+              colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
+            });
+          } catch {
+            // fallback
+          }
+        });
     }
   };
 

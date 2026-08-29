@@ -7,19 +7,6 @@ import { getStoredUser, getCommunityCandidates, CommunityCandidate, UserProfile 
 import { BottomNav } from "@/components/BottomNav";
 import confetti from "canvas-confetti";
 
-export type MatchCandidate = {
-  id: number;
-  nombre: string;
-  categoria: string;
-  categoryKey: "salud_mental" | "salud_fisica";
-  habito: string;
-  racha: number;
-  auraLevel: number;
-  colorFrom: string;
-  colorTo: string;
-  bio: string;
-};
-
 export interface ChatMessage {
   id: string;
   sender: "user" | "companion";
@@ -85,11 +72,33 @@ export default function HabitMatchPage() {
     const user = getStoredUser();
     if (user && user.name) {
       setCurrentUser(user);
-      const all = getCommunityCandidates();
-      const others = all.filter((c) => c.nombre !== user.name && c.id !== user.id);
-      const sameCat = others.filter((c) => c.categoryKey === user.category);
-      const diffCat = others.filter((c) => c.categoryKey !== user.category);
-      setCandidates([...sameCat, ...diffCat]);
+
+      // Register current user into the shared community API
+      const habitsList = user.goal || "Elevar mi nivel de Aura";
+      fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user, habitTitle: habitsList }),
+      }).catch((e) => console.error("Error publishing user to community API", e));
+
+      // Fetch candidates from community API (or fallback to local candidates)
+      fetch("/api/community")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.candidates && Array.isArray(data.candidates) && data.candidates.length > 0) {
+            const apiCandidates: CommunityCandidate[] = data.candidates;
+            const others = apiCandidates.filter((c) => c.nombre !== user.name && c.id !== user.id);
+            const sameCat = others.filter((c) => c.categoryKey === user.category);
+            const diffCat = others.filter((c) => c.categoryKey !== user.category);
+            const combined = [...sameCat, ...diffCat];
+            setCandidates(combined.length > 0 ? combined : getCommunityCandidates());
+          } else {
+            setCandidates(getCommunityCandidates());
+          }
+        })
+        .catch(() => {
+          setCandidates(getCommunityCandidates());
+        });
     } else {
       router.replace("/onboarding");
     }
@@ -98,6 +107,7 @@ export default function HabitMatchPage() {
   // Load persistent chat history when a candidate is matched
   useEffect(() => {
     if (matchedCandidate) {
+      // First load local cache
       const storageKey = `aura_chat_msg_${matchedCandidate.id}`;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -106,17 +116,34 @@ export default function HabitMatchPage() {
         } catch {
           setChatMessages([]);
         }
-      } else {
-        // Initial greeting message from candidate
-        const initialMsg: ChatMessage = {
-          id: `msg_init_${Date.now()}`,
-          sender: "companion",
-          text: `¡Hola ${currentUser?.name || "compañero"}! 🌟 Me alegra hacer match. Yo estoy enfocado/a en "${matchedCandidate.habito}". ¿Cómo va tu día?`,
-          timestamp: Date.now(),
-        };
-        setChatMessages([initialMsg]);
-        localStorage.setItem(storageKey, JSON.stringify([initialMsg]));
       }
+
+      // Fetch live messages from /api/chat
+      fetch(`/api/chat?matchId=${matchedCandidate.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+            const serverMsgs: ChatMessage[] = data.messages.map((m: any) => ({
+              id: m.id,
+              sender: m.sender === "user" ? "user" : "companion",
+              text: m.text,
+              timestamp: m.timestamp,
+            }));
+            setChatMessages(serverMsgs);
+            localStorage.setItem(storageKey, JSON.stringify(serverMsgs));
+          } else if (!saved) {
+            // Initial greeting message
+            const initialMsg: ChatMessage = {
+              id: `msg_init_${Date.now()}`,
+              sender: "companion",
+              text: `¡Hola ${currentUser?.name || "compañero"}! 🌟 Me alegra hacer match contigo. Mi hábito principal es "${matchedCandidate.habito}". ¿Cómo va tu día?`,
+              timestamp: Date.now(),
+            };
+            setChatMessages([initialMsg]);
+            localStorage.setItem(storageKey, JSON.stringify([initialMsg]));
+          }
+        })
+        .catch(() => {/* fallback to local */});
     }
   }, [matchedCandidate, currentUser]);
 
@@ -130,7 +157,7 @@ export default function HabitMatchPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-white/50 min-h-screen">
         <Sparkles className="w-8 h-8 text-purple-400 mb-3 animate-pulse" />
-        <p className="text-sm">Cargando tu comunidad de hábitos...</p>
+        <p className="text-sm">Cargando comunidad de hábitos...</p>
       </div>
     );
   }
@@ -185,264 +212,282 @@ export default function HabitMatchPage() {
 
     setIsTyping(true);
 
-    // Simulate real-time companion reply
-    setTimeout(() => {
-      const responses = [
-        `¡Muchas gracias por tu aliento, ${currentUser.name}! 💜 Mi meta de ${matchedCandidate.categoria.toLowerCase()} me tiene súper motivado/a. ¡Sigamos constantes hoy! 🔥`,
-        `¡Totalmente de acuerdo! Sostener el hábito de "${matchedCandidate.habito}" ha sido un cambio enorme para mí. ¡Tú también lograrás tu meta! ✨`,
-        `¡Gracias por la vibra positiva, ${currentUser.name}! Vamos a darle con todo hoy. ¡Tu aura se siente radiante! ⚡`,
-      ];
-      const randomReply = responses[Math.floor(Math.random() * responses.length)];
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId: matchedCandidate.id,
+          text: userText,
+          user: currentUser,
+          candidate: matchedCandidate,
+        }),
+      });
 
-      const companionReply: ChatMessage = {
-        id: `msg_cmp_${Date.now()}`,
-        sender: "companion",
-        text: randomReply,
-        timestamp: Date.now(),
-      };
-
-      const finalMsgs = [...updated, companionReply];
-      setChatMessages(finalMsgs);
-      localStorage.setItem(`aura_chat_msg_${matchedCandidate.id}`, JSON.stringify(finalMsgs));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.partnerMessage) {
+          const partnerReply: ChatMessage = {
+            id: data.partnerMessage.id,
+            sender: "companion",
+            text: data.partnerMessage.text,
+            timestamp: data.partnerMessage.timestamp,
+          };
+          const withReply = [...updated, partnerReply];
+          setChatMessages(withReply);
+          localStorage.setItem(`aura_chat_msg_${matchedCandidate.id}`, JSON.stringify(withReply));
+        }
+      }
+    } catch (e) {
+      console.error("Error al enviar mensaje a la API de chat", e);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   return (
     <div className="flex-1 flex flex-col justify-between p-5 min-h-screen relative pb-28">
-      {/* Background Ambient Glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-cyan-500/20 blur-3xl pointer-events-none" />
-
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/10 z-10">
+      <div className="flex items-center justify-between py-2 border-b border-white/10">
         <div>
-          <div className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-pink-400">
-            <Flame className="w-3 h-3 text-orange-400 fill-orange-400" />
-            <span>Aura Habit Match</span>
-          </div>
-          <h1 className="text-base font-bold text-white tracking-wide">Comunidad de Hábitos</h1>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-amber-400 flex items-center gap-1">
+            <Flame className="w-3 h-3 fill-amber-400" /> AURA HABIT MATCH
+          </span>
+          <h1 className="text-base font-extrabold text-white">Comunidad de Hábitos</h1>
         </div>
-        <div className="px-3 py-1 rounded-full glass-card text-xs font-semibold text-purple-300 border border-purple-500/30">
+        <div className="text-xs px-2.5 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 font-medium">
           {currentUser.category === "salud_mental" ? "🧠 Salud Emocional" : "💪 Salud Física"}
         </div>
       </div>
 
-      {/* MATCH MODAL vs CARD SWIPER */}
-      {!matchedCandidate ? (
-        <div className="my-auto flex flex-col items-center justify-center z-10 w-full animate-in fade-in zoom-in duration-300">
-          <p className="text-[11px] uppercase tracking-widest text-white/50 mb-4 font-medium">
-            Personas elevando su aura en tu categoría
-          </p>
+      {/* Main Tinder Card Section */}
+      <div className="my-auto py-4 flex flex-col items-center">
+        <p className="text-[10px] uppercase font-bold tracking-widest text-white/40 mb-3">
+          PERSONAS ELEVANDO SU AURA EN TU CATEGORÍA
+        </p>
 
-          {/* Candidate Card */}
-          <div className="w-full glass-card p-6 rounded-3xl border border-white/15 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
-            {/* Top Match Tag */}
-            <div className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/40 text-purple-300 text-[10px] font-bold tracking-wider">
-              ✦ {actualCandidate.auraLevel}% AURA
-            </div>
-
-            {/* Glowing Aura Orb Avatar */}
-            <div className="my-2">
-              <EsferaAura
-                nombre={actualCandidate.nombre}
-                colorFrom={actualCandidate.colorFrom}
-                colorTo={actualCandidate.colorTo}
-                size={90}
-              />
-            </div>
-
-            <h2 className="text-xl font-bold text-white mt-3">{actualCandidate.nombre}</h2>
-
-            <span className="mt-1 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold">
-              {actualCandidate.categoria}
-            </span>
-
-            <p className="text-xs text-white/50 mt-4">También está construyendo el hábito:</p>
-            <p className="text-sm text-white font-semibold mt-1 px-2 italic">
-              "{actualCandidate.habito}"
-            </p>
-
-            <p className="text-xs text-white/60 mt-3 font-light max-w-xs">
-              "{actualCandidate.bio}"
-            </p>
-
-            {/* Streak Badge */}
-            <div className="flex items-center gap-1.5 mt-4 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-xs">
-              <Flame className="w-4 h-4 text-amber-400 fill-amber-400" />
-              <span>{actualCandidate.racha} días de racha activa</span>
-            </div>
+        {/* Dynamic User Card */}
+        <div className="w-full max-w-sm glass-card p-6 rounded-3xl border border-white/15 shadow-2xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-300">
+          <div className="absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-950/80 border border-purple-500/40 text-purple-300">
+            ✦ {actualCandidate.auraLevel}% AURA
           </div>
 
-          {/* Swipe Buttons (X & Match Logo) */}
-          <div className="flex items-center justify-center gap-8 mt-6">
-            <button
-              onClick={pasar}
-              className="w-14 h-14 rounded-full glass-card border border-white/15 flex items-center justify-center hover:bg-white/10 hover:border-white/30 transition-all shadow-lg active:scale-95 cursor-pointer"
-              aria-label="Pasar"
-              title="Pasar"
-            >
-              <X className="w-6 h-6 text-white/50 hover:text-white" />
-            </button>
+          <div className="my-3">
+            <EsferaAura
+              nombre={actualCandidate.nombre}
+              colorFrom={actualCandidate.colorFrom}
+              colorTo={actualCandidate.colorTo}
+              photoUrl={actualCandidate.photoUrl}
+              size={110}
+            />
+          </div>
 
-            <button
-              onClick={darLike}
-              className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center transition-all shadow-[0_0_30px_rgba(59,130,246,0.8)] hover:scale-105 active:scale-95 cursor-pointer"
-              aria-label="Conectar Match"
-              title="Hacer Match"
-            >
+          <h2 className="text-xl font-bold text-white mb-0.5">{actualCandidate.nombre}</h2>
+          <span className="text-xs font-medium text-cyan-300/90 mb-3 px-3 py-0.5 rounded-full bg-cyan-950/40 border border-cyan-500/20">
+            {actualCandidate.categoria}
+          </span>
+
+          <div className="w-full bg-white/5 p-3 rounded-2xl border border-white/10 my-2 text-xs">
+            <span className="text-white/50 block text-[10px] uppercase font-bold tracking-wider mb-1">
+              También está construyendo el hábito:
+            </span>
+            <p className="font-semibold text-amber-300 italic">&quot;{actualCandidate.habito}&quot;</p>
+          </div>
+
+          <p className="text-xs text-white/70 italic max-w-xs mb-3 font-light">&quot;{actualCandidate.bio}&quot;</p>
+
+          <div className="flex items-center gap-1.5 text-xs text-amber-400 font-bold bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/30">
+            <Flame className="w-3.5 h-3.5 fill-amber-400" />
+            <span>{actualCandidate.racha} días de racha activa</span>
+          </div>
+        </div>
+
+        {/* Swipe Action Buttons */}
+        <div className="flex items-center gap-6 mt-6">
+          <button
+            type="button"
+            onClick={pasar}
+            className="w-14 h-14 rounded-full glass-card border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-red-500/50 hover:bg-red-950/20 transition-all shadow-lg active:scale-95 cursor-pointer"
+            title="Pasar"
+          >
+            <X className="w-6 h-6 text-red-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={darLike}
+            className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-400 p-[2px] shadow-[0_0_25px_rgba(124,58,237,0.5)] active:scale-95 transition-all cursor-pointer group"
+            title="Conectar"
+          >
+            <div className="w-full h-full rounded-full bg-[#0A0A1A] group-hover:bg-gradient-to-tr group-hover:from-purple-600 group-hover:to-cyan-400 flex items-center justify-center transition-all p-2">
               <img
                 src="/logo-azul.png"
                 alt="Match Aura"
-                className="w-full h-full object-cover scale-110"
+                className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]"
               />
-            </button>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* MATCH POPUP MODAL */}
+      {matchedCandidate && !showChatModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300">
+          <div className="w-full max-w-sm glass-card p-6 rounded-3xl border border-purple-500/40 text-center relative shadow-2xl flex flex-col items-center space-y-4">
+            <div className="relative my-2">
+              <Sparkles className="w-8 h-8 text-amber-300 absolute -top-4 -right-4 animate-bounce" />
+              <img
+                src="/logo-naranja.png"
+                alt="Match Exitoso"
+                className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(249,115,22,0.9)] animate-pulse"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-black text-white">¡AURA MATCH! ✦</h2>
+              <p className="text-xs text-purple-200 mt-1">
+                Tú y <strong className="text-white">{matchedCandidate.nombre}</strong> están construyendo hábitos similares para transformar su vida.
+              </p>
+            </div>
+
+            {/* Side-by-side User Photos/Orbs */}
+            <div className="flex items-center justify-center gap-3 my-2">
+              <div className="flex flex-col items-center">
+                <EsferaAura
+                  nombre={currentUser.name}
+                  colorFrom="#8B5CF6"
+                  colorTo="#06B6D4"
+                  photoUrl={currentUser.photoUrl}
+                  size={64}
+                />
+                <span className="text-[10px] font-bold text-white mt-1">{currentUser.name}</span>
+              </div>
+
+              <span className="text-amber-400 font-extrabold text-sm">⚡</span>
+
+              <div className="flex flex-col items-center">
+                <EsferaAura
+                  nombre={matchedCandidate.nombre}
+                  colorFrom={matchedCandidate.colorFrom}
+                  colorTo={matchedCandidate.colorTo}
+                  photoUrl={matchedCandidate.photoUrl}
+                  size={64}
+                />
+                <span className="text-[10px] font-bold text-white mt-1">{matchedCandidate.nombre}</span>
+              </div>
+            </div>
+
+            <div className="w-full space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowChatModal(true)}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-cyan-500 to-amber-500 text-white font-bold text-xs tracking-wide shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] transition-all"
+              >
+                <MessageCircle className="w-4 h-4 fill-white" />
+                <span>Abrir Chat de Aura</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={cerrarMatch}
+                className="w-full py-2.5 text-xs font-semibold text-white/50 hover:text-white transition-colors cursor-pointer"
+              >
+                Continuar buscando personas
+              </button>
+            </div>
           </div>
         </div>
-      ) : !showChatModal ? (
-        /* MATCH REVEAL SCREEN */
-        <div className="my-auto flex flex-col items-center justify-center text-center z-10 w-full animate-in zoom-in fade-in duration-500">
-          <div className="relative mb-2">
-            <div className="absolute inset-0 rounded-full bg-orange-500/30 blur-2xl animate-pulse" />
-            <img
-              src="/logo-naranja.png"
-              alt="Match Logrado"
-              className="w-20 h-20 object-contain relative z-10 animate-bounce drop-shadow-[0_0_35px_rgba(249,115,22,0.9)]"
-            />
-          </div>
+      )}
 
-          <h2 className="text-3xl font-extrabold text-white tracking-tight drop-shadow-[0_0_25px_rgba(249,115,22,0.8)]">
-            ¡Conexión de Aura! 🔥
-          </h2>
-
-          <div className="my-5 flex items-center justify-center gap-4">
-            {/* Current User initials/photo orb */}
-            <EsferaAura
-              nombre={currentUser.name || "Tú"}
-              colorFrom="#8b5cf6"
-              colorTo="#3b82f6"
-              photoUrl={currentUser.photoUrl}
-              size={76}
-            />
-            <img
-              src="/logo-naranja.png"
-              alt="Aura Flame Match"
-              className="w-8 h-8 object-contain animate-pulse drop-shadow-[0_0_15px_rgba(249,115,22,0.9)]"
-            />
-            {/* Candidate Orb */}
-            <EsferaAura
-              nombre={matchedCandidate.nombre}
-              colorFrom={matchedCandidate.colorFrom}
-              colorTo={matchedCandidate.colorTo}
-              size={76}
-            />
-          </div>
-
-          <p className="text-xs text-white/80 max-w-xs leading-relaxed font-medium">
-            Tú y <strong className="text-pink-300">{matchedCandidate.nombre}</strong> están persiguiendo el mismo compromiso de transformación. ¡Ahora no lo enfrentas solo/a!
-          </p>
-
-          <div className="w-full max-w-xs mt-6 space-y-2.5">
-            <button
-              onClick={() => setShowChatModal(true)}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-purple-600 to-cyan-500 text-white font-bold text-xs tracking-wide shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <MessageCircle className="w-4 h-4 text-amber-200" />
-              <span>Abrir Chat con {matchedCandidate.nombre}</span>
-            </button>
-
-            <button
-              onClick={cerrarMatch}
-              className="w-full py-2.5 text-xs text-white/50 hover:text-white transition-colors"
-            >
-              Explorar más compañeros
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* INTERACTIVE LIVE CHAT OVERLAY */
-        <div className="my-auto flex flex-col justify-between z-10 w-full glass-card p-4 rounded-3xl border border-white/20 shadow-2xl min-h-[440px] max-h-[520px] animate-in slide-in-from-bottom duration-300">
+      {/* REAL CHAT MODAL */}
+      {matchedCandidate && showChatModal && (
+        <div className="fixed inset-0 z-50 bg-[#0A0A1A] flex flex-col justify-between animate-in slide-in-from-bottom duration-300">
           {/* Chat Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
-            <button
-              onClick={() => setShowChatModal(false)}
-              className="flex items-center gap-1 text-xs text-white/60 hover:text-white"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
+          <div className="p-4 border-b border-white/10 bg-[#0D0D24] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowChatModal(false)}
+                className="p-1 rounded-full text-white/60 hover:text-white cursor-pointer"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
 
-            <div className="flex items-center gap-2">
               <EsferaAura
                 nombre={matchedCandidate.nombre}
                 colorFrom={matchedCandidate.colorFrom}
                 colorTo={matchedCandidate.colorTo}
-                size={32}
+                photoUrl={matchedCandidate.photoUrl}
+                size={40}
               />
-              <div className="text-left">
-                <h3 className="text-xs font-bold text-white leading-tight">{matchedCandidate.nombre}</h3>
-                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  En línea
+
+              <div>
+                <h3 className="text-sm font-bold text-white leading-tight flex items-center gap-1.5">
+                  <span>{matchedCandidate.nombre}</span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                </h3>
+                <span className="text-[11px] text-amber-300/90 font-medium">
+                  {matchedCandidate.categoria} • {matchedCandidate.racha}d racha
                 </span>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={cerrarMatch}
-              className="p-1.5 rounded-full glass-card text-white/50 hover:text-white"
-              title="Cerrar conversación"
+              className="p-1.5 rounded-full text-white/40 hover:text-white cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Chat Messages List */}
-          <div className="flex-1 overflow-y-auto py-3 space-y-3 px-1">
+          {/* Chat Messages Container */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-3">
             {chatMessages.map((msg) => {
               const isMe = msg.sender === "user";
               return (
-                <div
-                  key={msg.id}
-                  className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}
-                >
+                <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                   <div
-                    className={`max-w-[80%] p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                    className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-lg ${
                       isMe
-                        ? "bg-gradient-to-r from-purple-600 to-cyan-500 text-white rounded-br-none shadow-md"
-                        : "glass-card text-white/90 border-white/20 rounded-bl-none shadow-md"
+                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-br-none"
+                        : "glass-card text-white/90 border-purple-500/30 rounded-bl-none"
                     }`}
                   >
-                    {msg.text}
+                    <p>{msg.text}</p>
+                    <span className={`text-[9px] mt-1 block font-mono ${isMe ? "text-white/60 text-right" : "text-white/40 text-left"}`}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
                 </div>
               );
             })}
 
             {isTyping && (
-              <div className="flex justify-start animate-in fade-in">
-                <div className="glass-card px-3 py-2 rounded-2xl text-xs text-purple-300/80 flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
-                  <span>{matchedCandidate.nombre} está escribiendo...</span>
-                </div>
+              <div className="flex items-center gap-2 text-xs text-purple-300/80 animate-pulse py-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                <span>{matchedCandidate.nombre} está escribiendo...</span>
               </div>
             )}
+
             <div ref={chatBottomRef} />
           </div>
 
-          {/* Chat Input Footer */}
-          <div className="pt-2 border-t border-white/10 flex items-center gap-2">
+          {/* Chat Input Bar */}
+          <div className="p-3 border-t border-white/10 bg-[#0D0D24] flex items-center gap-2">
             <input
               type="text"
               placeholder={`Escribe a ${matchedCandidate.nombre}...`}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendChatMessage()}
-              className="flex-1 px-4 py-2.5 glass-input text-xs text-white"
+              className="flex-1 px-4 py-3 glass-input text-xs text-white"
             />
             <button
+              type="button"
               onClick={handleSendChatMessage}
               disabled={!chatInput.trim()}
-              className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-white disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+              className="p-3 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white disabled:opacity-40 hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer shadow-lg"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -450,7 +495,7 @@ export default function HabitMatchPage() {
         </div>
       )}
 
-      {/* Bottom Nav Bar */}
+      {/* PWA Bottom Navigation */}
       <BottomNav />
     </div>
   );

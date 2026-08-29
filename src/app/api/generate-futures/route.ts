@@ -1,109 +1,102 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { user, habitsCount = 5 } = body;
 
-    if (!user) {
+    if (!user || !user.name) {
       return NextResponse.json({ error: "Faltan datos del usuario" }, { status: 400 });
     }
 
-    const googleApiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY;
 
-    if (!googleApiKey) {
-      console.warn("GOOGLE_API_KEY no configurada en env. Usando fallback dinámico.");
-      return NextResponse.json({
-        darkFuture: `En tres meses, ${user.name}, la falta de constancia apaga tu energía y tu meta ("${user.goal}") luce distante.`,
-        brightFuture: `Imagina despertar con claridad, ${user.name}. Al sostener tus hábitos diarios, la calma reemplaza la tensión. En 90 días, conquistas tu meta ("${user.goal}") desde una profunda paz interior.`,
-        habits: [
-          { title: "Meditar 5 min al despertar", difficulty: "easy", auraPoints: 5 },
-          { title: "Tomar 2 Litros de agua", difficulty: "easy", auraPoints: 5 },
-          { title: "Lectura o caminata 20 min", difficulty: "normal", auraPoints: 8 },
-          { title: "Avance de 30 min en tu meta principal", difficulty: "normal", auraPoints: 8 },
-          { title: "Desconectar pantallas 1h antes de dormir", difficulty: "hard", auraPoints: 12 },
-        ],
-      });
-    }
+    if (apiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
 
-    const prompt = `Eres el motor de IA de la aplicación AURA (diseñada con neuropsicología).
-Tu misión es analizar la meta personal del usuario y su evaluación inicial, y generar:
-1. DOS escenas futuristas cortas (máximo 75 palabras cada una) en segunda persona ("tú").
-2. CINCO micro-hábitos accionables y ultraconcretos diseñados con inteligencia artificial para ayudarle a alcanzar su meta específica ("${user.goal}").
+        const prompt = `Eres el motor de Inteligencia Artificial de la aplicación AURA (basada en psicología del comportamiento).
+Tu objetivo es analizar la meta personal del usuario y su evaluación actual, y generar:
+1. DOS proyecciones narrativas futuristas cortas (máximo 65 palabras cada una) en segunda persona ("tú").
+2. CINCO micro-hábitos atómicos y súper concretos diseñados para ayudarle a alcanzar su meta específica: "${user.goal}".
 
 DATOS DEL USUARIO:
 - Nombre: ${user.name}
 - Meta personal escrita: "${user.goal}"
 - Categoría: ${user.category === "salud_mental" ? "Salud Emocional" : "Salud Física"}
-- Nivel de Aura Evaluado: ${user.auraLevel || 50}/100
+- Nivel de Aura Actual: ${user.auraLevel || 50}/100
 
-Instrucciones de los hábitos:
-- Deben ser atómicos, prácticos y directamente conectados con su meta ("${user.goal}").
-- Asigna 2 hábitos 'easy' (5 pts), 2 hábitos 'normal' (8 pts) y 1 hábito 'hard' (12 pts).
+INSTRUCCIONES DE LOS HÁBITOS:
+- Deben ser prácticos, diarios y directamente alineados con su meta ("${user.goal}").
+- Incluye 2 hábitos 'easy' (5 pts), 2 hábitos 'normal' (8 pts) y 1 hábito 'hard' (12 pts).
 
-Responde EXCLUSIVAMENTE con este formato JSON válido:
+Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 {
-  "darkFuture": "Escena de futuro si abandona su meta...",
-  "brightFuture": "Escena de futuro si sostiene su disciplina...",
+  "darkFuture": "Escena en 90 días si posterga su meta...",
+  "brightFuture": "Escena en 90 días si sostiene su disciplina...",
   "habits": [
-    { "title": "Hábito 1 personalizado", "difficulty": "easy", "auraPoints": 5 },
-    { "title": "Hábito 2 personalizado", "difficulty": "easy", "auraPoints": 5 },
-    { "title": "Hábito 3 personalizado", "difficulty": "normal", "auraPoints": 8 },
-    { "title": "Hábito 4 personalizado", "difficulty": "normal", "auraPoints": 8 },
-    { "title": "Hábito 5 personalizado", "difficulty": "hard", "auraPoints": 12 }
+    { "title": "Hábito 1 alineado", "difficulty": "easy", "auraPoints": 5 },
+    { "title": "Hábito 2 alineado", "difficulty": "easy", "auraPoints": 5 },
+    { "title": "Hábito 3 alineado", "difficulty": "normal", "auraPoints": 8 },
+    { "title": "Hábito 4 alineado", "difficulty": "normal", "auraPoints": 8 },
+    { "title": "Hábito 5 alineado", "difficulty": "hard", "auraPoints": 12 }
   ]
 }`;
 
-    let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${googleApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.8,
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.8,
-            },
-          }),
+        let rawText = "";
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: prompt,
+          });
+          rawText = response.text?.trim() || "";
+        } catch (mErr) {
+          console.warn("Primary model error, retrying fallback model", mErr);
+          const fallbackResponse = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: prompt,
+          });
+          rawText = fallbackResponse.text?.trim() || "";
         }
-      );
+
+        if (rawText) {
+          const cleanedText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+          const parsed = JSON.parse(cleanedText);
+
+          if (parsed.darkFuture && parsed.brightFuture) {
+            return NextResponse.json({
+              darkFuture: parsed.darkFuture,
+              brightFuture: parsed.brightFuture,
+              habits: parsed.habits && Array.isArray(parsed.habits) ? parsed.habits : [],
+            });
+          }
+        }
+      } catch (sdkError) {
+        console.error("Error consultando la API de Gemini vía SDK", sdkError);
+      }
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini API Error:", errText);
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
+    // Dynamic fallback matching user goal
+    const isMental = user.category === "salud_mental";
+    const darkText = isMental
+      ? `En noventa días, ${user.name}, la constante postergación de tus momentos de pausa hace que la tensión del día se acumule. La meta de "${user.goal}" se percibe cada vez más distante si no estableces tus límites hoy.`
+      : `En noventa días, ${user.name}, el desbalance en tus rutinas físicas reduce tu vitalidad diaria. La meta de "${user.goal}" requiere recuperar tu energía paso a paso.`;
 
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const brightText = isMental
+      ? `Visualiza tu vida en noventa días, ${user.name}. Al sostener tus pequeños rituales diarios, la serenidad transforma tu descanso y alcanzas tu meta de "${user.goal}" con plena claridad.`
+      : `Siente la energía en tu cuerpo en noventa días, ${user.name}. Cada hábito cumplido te fortalece y conquistas tu meta de "${user.goal}" con vitalidad radiante.`;
 
-    if (!rawText) {
-      throw new Error("Respuesta vacía de Gemini");
-    }
-
-    const parsed = JSON.parse(rawText);
     return NextResponse.json({
-      darkFuture: parsed.darkFuture || "",
-      brightFuture: parsed.brightFuture || "",
-      habits: parsed.habits && Array.isArray(parsed.habits) ? parsed.habits : [],
+      darkFuture: darkText,
+      brightFuture: brightText,
+      habits: [
+        { title: `Ritual diario para ${user.goal}`, difficulty: "easy", auraPoints: 5 },
+        { title: "Pausa consciente de 5 minutos", difficulty: "easy", auraPoints: 5 },
+        { title: "Lectura o enfoque sin distracciones", difficulty: "normal", auraPoints: 8 },
+        { title: "Avance concreto de 20 min en tu meta", difficulty: "normal", auraPoints: 8 },
+        { title: "Desconexión total de pantallas antes de dormir", difficulty: "hard", auraPoints: 12 },
+      ],
     });
   } catch (error: any) {
     console.error("Error en /api/generate-futures:", error);
