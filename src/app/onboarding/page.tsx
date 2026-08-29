@@ -241,10 +241,13 @@ export default function OnboardingPage() {
           uploadUrl = uploadUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
         }
       }
+      if (uploadUrl.includes("loca.lt") && !uploadUrl.includes("bypass-tunnel-reminder")) {
+        uploadUrl += (uploadUrl.includes("?") ? "&" : "?") + "bypass-tunnel-reminder=true";
+      }
 
       const res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": "image/jpeg" },
+        headers: { "Content-Type": "image/jpeg", "Bypass-Tunnel-Remainder": "true" },
         body: blob,
       });
 

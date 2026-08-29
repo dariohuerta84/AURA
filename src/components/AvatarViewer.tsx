@@ -72,6 +72,10 @@ function ModeloGLB({ url }: { url: string }) {
     }
   }
 
+  if (targetUrl && targetUrl.includes("loca.lt") && !targetUrl.includes("bypass-tunnel-reminder")) {
+    targetUrl += (targetUrl.includes("?") ? "&" : "?") + "bypass-tunnel-reminder=true";
+  }
+
   // Three.js GLTFLoader necesita saber que es un binario .glb por la extensión del URL
   if (targetUrl && !targetUrl.includes(".glb") && !targetUrl.includes(".gltf")) {
     targetUrl += "#avatar.glb";
