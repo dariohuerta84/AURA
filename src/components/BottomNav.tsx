@@ -27,14 +27,14 @@ export const BottomNav: React.FC = () => {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex items-center justify-center p-2.5 rounded-full bg-gradient-to-tr from-cyan-600 via-blue-600 to-purple-600 text-white shadow-[0_0_25px_rgba(59,130,246,0.7)] transition-all duration-300 ${
-                  isActive ? "scale-110 ring-2 ring-cyan-300/80" : "hover:scale-105"
+                className={`relative flex items-center justify-center w-12 h-12 rounded-full overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] transition-all duration-300 ${
+                  isActive ? "scale-110 ring-2 ring-cyan-300/90" : "hover:scale-105"
                 }`}
               >
                 <img
                   src="/logo-azul.png"
                   alt="Aura Match"
-                  className="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]"
+                  className="w-full h-full object-cover scale-110"
                 />
                 <span className="sr-only">{item.label}</span>
               </Link>

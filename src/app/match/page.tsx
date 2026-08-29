@@ -264,14 +264,14 @@ export default function HabitMatchPage() {
 
             <button
               onClick={darLike}
-              className="w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-[0_0_30px_rgba(59,130,246,0.7)] hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-tr from-cyan-600 via-blue-600 to-purple-600"
+              className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center transition-all shadow-[0_0_30px_rgba(59,130,246,0.8)] hover:scale-105 active:scale-95 cursor-pointer"
               aria-label="Conectar Match"
               title="Hacer Match"
             >
               <img
                 src="/logo-azul.png"
                 alt="Match Aura"
-                className="w-9 h-9 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                className="w-full h-full object-cover scale-110"
               />
             </button>
           </div>
