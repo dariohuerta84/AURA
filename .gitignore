@@ -58,3 +58,7 @@ venv/
 
 # --- Django muerto (eliminado, no volver a commitear) ---
 /backend/
+
+# artefactos de prueba del worker GPU (mock_avatar.glb SI se versiona)
+/gpu_service/test_server_output.glb
+/gpu_service/valid_avatar.glb
