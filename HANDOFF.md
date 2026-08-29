@@ -40,7 +40,7 @@ navegador → Convex (BD + storage + scheduler) → ngrok → tu PC (TripoSR)
    cd TripoSR
    python3.10 -m venv .venv
    source .venv/bin/activate          # Linux / macOS
-   # .venv\Scriptsctivate          # Windows
+   # .venv\Scripts\activate     # Windows
    pip install --upgrade pip setuptools wheel
    ```
 
@@ -59,7 +59,7 @@ navegador → Convex (BD + storage + scheduler) → ngrok → tu PC (TripoSR)
    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
    # b) el resto, sin gradio
-   pip install omegaconf==2.3.0 Pillow einops==0.7.0 transformers==4.35.0        trimesh==4.0.5 rembg huggingface-hub "imageio[ffmpeg]"        xatlas==0.0.9 moderngl==5.10.0
+   pip install omegaconf==2.3.0 Pillow einops==0.7.0 transformers==4.35.0 trimesh==4.0.5 rembg huggingface-hub "imageio[ffmpeg]" xatlas==0.0.9 moderngl==5.10.0
 
    # c) torchmcubes al final: compila, necesita el toolkit de CUDA instalado
    pip install git+https://github.com/tatsy/torchmcubes.git
