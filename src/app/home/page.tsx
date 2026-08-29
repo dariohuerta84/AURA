@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles, Flame, Plus, Brain, Activity, CheckCircle2, Loader2 } from "lucide-react";
+import { Sparkles, Flame, Plus, Brain, Activity, CheckCircle2, Loader2, Target, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getStoredUser, getStoredHabits, saveStoredHabits, saveStoredUser, UserProfile, Habit } from "@/lib/store";
+import { getStoredUser, getStoredHabits, saveStoredHabits, saveStoredUser, saveStoredFutures, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import { HabitCard } from "@/components/HabitCard";
 import { BottomNav } from "@/components/BottomNav";
@@ -30,6 +30,12 @@ export default function HomePage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [isGeneratingAiHabits, setIsGeneratingAiHabits] = useState(false);
+
+  // Goal & Add Habit Modal State
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [newGoalInput, setNewGoalInput] = useState("");
+  const [customHabitTitle, setCustomHabitTitle] = useState("");
+  const [isGeneratingGoalHabits, setIsGeneratingGoalHabits] = useState(false);
 
   const handleReplaceHabit = async (id: string) => {
     if (!user || replacingId) return;
@@ -84,9 +90,13 @@ export default function HomePage() {
       const currentHabits = getStoredHabits(u.category);
       setHabits(currentHabits);
 
-      // Auto-regenerate with AI if habits are still the default static ones or empty
-      const allDefault = currentHabits.length === 0 || currentHabits.every((h) => h.isDefault === true);
-      if (allDefault) {
+      // Auto-regenerate with AI if habits are static default ones
+      const isStaticDefault =
+        currentHabits.length === 0 ||
+        currentHabits.every((h) => h.isDefault === true) ||
+        currentHabits.some((h) => h.title.includes("Meditar 5 minutos en calma") || h.title.includes("Tomar 2 Litros de agua"));
+
+      if (isStaticDefault) {
         setIsGeneratingAiHabits(true);
         fetch("/api/generate-futures", {
           method: "POST",
@@ -132,7 +142,6 @@ export default function HomePage() {
     setHabits(updated);
     saveStoredHabits(updated);
 
-    // Calculate updated aura
     const completedCount = updated.filter((h) => h.completedToday).length;
     const totalCount = updated.length || 1;
     const ratio = completedCount / totalCount;
@@ -143,6 +152,75 @@ export default function HomePage() {
     const updatedUser = { ...user, auraLevel: newAuraLevel };
     setUser(updatedUser);
     saveStoredUser(updatedUser);
+  };
+
+  const handleSaveNewGoalAndHabits = async () => {
+    if (!newGoalInput.trim() || !user) return;
+
+    setIsGeneratingGoalHabits(true);
+    const updatedUser: UserProfile = { ...user, goal: newGoalInput.trim() };
+
+    try {
+      const res = await fetch("/api/generate-futures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: updatedUser, habitsCount: 5 }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
+          const aiHabits: Habit[] = data.habits.map((h: any, i: number) => ({
+            id: `ai_goal_${Date.now()}_${i}`,
+            title: h.title || "",
+            category: user.category,
+            isDefault: false,
+            difficulty: h.difficulty || "normal",
+            auraPoints: h.auraPoints || 8,
+            completedToday: false,
+          }));
+
+          setHabits(aiHabits);
+          saveStoredHabits(aiHabits);
+        }
+
+        if (data.darkFuture && data.brightFuture) {
+          saveStoredFutures({
+            darkFuture: data.darkFuture,
+            brightFuture: data.brightFuture,
+            date: new Date().toISOString().split("T")[0],
+            createdAt: Date.now(),
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error al actualizar meta con IA", e);
+    } finally {
+      setUser(updatedUser);
+      saveStoredUser(updatedUser);
+      setIsGeneratingGoalHabits(false);
+      setShowGoalModal(false);
+    }
+  };
+
+  const handleAddManualHabit = () => {
+    if (!customHabitTitle.trim() || !user) return;
+
+    const newHabit: Habit = {
+      id: `man_${Date.now()}`,
+      title: customHabitTitle.trim(),
+      category: user.category,
+      isDefault: false,
+      difficulty: "normal",
+      auraPoints: 8,
+      completedToday: false,
+    };
+
+    const updated = [...habits, newHabit];
+    setHabits(updated);
+    saveStoredHabits(updated);
+    setCustomHabitTitle("");
+    setShowGoalModal(false);
   };
 
   if (!user) {
@@ -200,7 +278,7 @@ export default function HomePage() {
       </div>
 
       {/* Primary WOW Action Button: Dos Futuros */}
-      <div className="my-3">
+      <div className="my-2">
         <Link
           href="/two-futures"
           className="w-full py-4 px-5 rounded-2xl glow-button text-white font-bold text-sm tracking-wide shadow-2xl flex items-center justify-between group"
@@ -214,6 +292,30 @@ export default function HomePage() {
           </div>
           <span className="text-xs text-amber-200 group-hover:translate-x-1 transition-transform">→</span>
         </Link>
+      </div>
+
+      {/* Current Active Goal Card Banner */}
+      <div className="my-2 glass-card p-3.5 rounded-2xl border border-purple-500/30 flex items-center justify-between gap-3 shadow-lg">
+        <div className="flex-1 pr-1">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-purple-400">
+            <Target className="w-3.5 h-3.5 text-purple-400" />
+            <span>Meta Personal Actual</span>
+          </div>
+          <p className="text-xs font-semibold text-white mt-1 line-clamp-2">
+            &quot;{user.goal}&quot;
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setNewGoalInput(user.goal);
+            setShowGoalModal(true);
+          }}
+          className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer hover:scale-105"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Nueva Meta</span>
+        </button>
       </div>
 
       {/* Daily Habits Section */}
@@ -238,7 +340,7 @@ export default function HomePage() {
             <div className="space-y-2.5">
               <div className="p-3 text-center rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center justify-center gap-2 animate-pulse">
                 <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-                <span>Generando hábitos personalizados con IA...</span>
+                <span>Generando hábitos personalizados con IA para tu meta...</span>
               </div>
               <HabitSkeletonCard />
               <HabitSkeletonCard />
@@ -263,6 +365,83 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Modal: Agregar / Editar Meta e Hábitos IA */}
+      {showGoalModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm glass-card p-5 rounded-3xl border border-purple-500/40 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-purple-400" />
+                <h3 className="text-sm font-bold text-white">Nueva Meta u Objetivo</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGoalModal(false)}
+                className="p-1 rounded-full glass-card text-white/50 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-white/70 font-medium block">
+                Escribe tu meta en tus palabras:
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Ejemplo: Quiero reducir el estrés laboral y terminar mis tareas antes de las 6pm..."
+                value={newGoalInput}
+                onChange={(e) => setNewGoalInput(e.target.value)}
+                className="w-full p-3 glass-input text-xs leading-relaxed resize-none text-white"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveNewGoalAndHabits}
+              disabled={!newGoalInput.trim() || isGeneratingGoalHabits}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-cyan-500 to-amber-500 text-white font-bold text-xs tracking-wide shadow-lg disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              {isGeneratingGoalHabits ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generando hábitos con IA...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>Generar 5 Hábitos con IA</span>
+                </>
+              )}
+            </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="flex-shrink mx-2 text-[10px] text-white/40 uppercase tracking-widest font-semibold">o añadir hábito manual</span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Nombre de hábito personalizado..."
+                value={customHabitTitle}
+                onChange={(e) => setCustomHabitTitle(e.target.value)}
+                className="flex-1 px-3 py-2.5 glass-input text-xs text-white"
+              />
+              <button
+                type="button"
+                onClick={handleAddManualHabit}
+                disabled={!customHabitTitle.trim()}
+                className="px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-semibold text-xs disabled:opacity-40 hover:bg-white/20 transition-all shrink-0 cursor-pointer"
+              >
+                + Añadir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PWA Bottom Navigation */}
       <BottomNav />
