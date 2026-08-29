@@ -11,6 +11,7 @@ env:
   SERVICE_NAME: aura
   REPO_NAME: aura-registry
   RUNTIME_SERVICE_ACCOUNT: rumi-runtime@angelic-throne-502610-v3.iam.gserviceaccount.com
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 permissions:
   contents: read
