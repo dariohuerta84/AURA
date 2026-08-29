@@ -16,7 +16,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto px-4 pb-4 pt-1 pointer-events-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1 pointer-events-auto">
       <div className="glass-card flex items-center justify-around py-2.5 px-3 border border-white/15 bg-black/70 backdrop-blur-xl rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.9)]">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
