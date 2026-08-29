@@ -236,8 +236,10 @@ export default function OnboardingPage() {
     try {
       setIs3DGenerating(true);
       let uploadUrl = await generateUploadUrl();
-      if (typeof window !== "undefined" && window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-        uploadUrl = uploadUrl.replace("127.0.0.1", window.location.hostname).replace("localhost", window.location.hostname);
+      if (typeof window !== "undefined") {
+        if (uploadUrl.includes("127.0.0.1:3212") || uploadUrl.includes("localhost:3212")) {
+          uploadUrl = uploadUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
+        }
       }
 
       const res = await fetch(uploadUrl, {

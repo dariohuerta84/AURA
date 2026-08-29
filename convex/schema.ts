@@ -119,11 +119,17 @@ export default defineSchema({
   }).index("by_user_date", ["userId", "date"]),
 
   avatars: defineTable({
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("done"),
+      v.literal("error")
+    ),
     photoStorageId: v.id("_storage"),
     meshStorageId: v.optional(v.id("_storage")),
     errorMessage: v.optional(v.string()),
-    createdAt: v.number(),
+    createdAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
   }).index("by_status", ["status"]),
 });

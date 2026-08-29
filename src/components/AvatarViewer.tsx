@@ -66,8 +66,10 @@ function encuadrar(objeto: THREE.Object3D, alturaDeseada = 2) {
 
 function ModeloGLB({ url }: { url: string }) {
   let targetUrl = url;
-  if (targetUrl && typeof window !== "undefined" && window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    targetUrl = targetUrl.replace("127.0.0.1", window.location.hostname).replace("localhost", window.location.hostname);
+  if (targetUrl && typeof window !== "undefined") {
+    if (targetUrl.includes("127.0.0.1:3212") || targetUrl.includes("localhost:3212")) {
+      targetUrl = targetUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
+    }
   }
 
   // Three.js GLTFLoader necesita saber que es un binario .glb por la extensión del URL
