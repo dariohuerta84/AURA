@@ -1,0 +1,1 @@
+{"version":3,"file":"defaultEnv.d.ts","sourceRoot":"","sources":["../../../../src/cli/lib/defaultEnv.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,0BAA0B,CAAC;AACnD,OAAO,EAAE,mBAAmB,EAAE,MAAM,UAAU,CAAC;AAC/C,OAAO,EAAU,aAAa,EAAgB,MAAM,UAAU,CAAC;AAG/D,wBAAgB,iBAAiB,CAC/B,GAAG,EAAE,OAAO,EACZ,SAAS,EAAE,MAAM,EACjB,KAAK,EAAE,mBAAmB,GACzB,aAAa,CAqDf"}

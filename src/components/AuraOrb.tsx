@@ -2,11 +2,17 @@
 
 import React, { useMemo } from "react";
 import { Sparkles, Flame, Zap } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+
+const AvatarViewer = dynamic(() => import("./AvatarViewer"), { ssr: false });
 
 interface AuraOrbProps {
   auraLevel: number; // 0-100
   streak: number;
   photoUrl?: string;
+  meshUrl?: string;
   size?: "sm" | "md" | "lg";
   showDetails?: boolean;
 }
@@ -15,9 +21,13 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
   auraLevel,
   streak,
   photoUrl,
+  meshUrl,
   size = "md",
   showDetails = true,
 }) => {
+  const latestAvatar = useQuery(api.avatars.getLatestAvatar);
+  const activeMeshUrl = meshUrl || latestAvatar?.meshUrl;
+
   const tier = useMemo(() => {
     if (auraLevel <= 20) return { title: "APAGADA", color: "#6B7280", gradient: "from-gray-700 via-purple-950 to-black", textCol: "text-gray-400" };
     if (auraLevel <= 40) return { title: "TENUE", color: "#A78BFA", gradient: "from-purple-900 via-indigo-950 to-slate-950", textCol: "text-purple-300" };
@@ -53,8 +63,12 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
         <div
           className={`aura-orb-element ${orbDimensions} rounded-full bg-gradient-to-br ${tier.gradient} flex flex-col items-center justify-center border border-white/30 shadow-2xl transition-transform duration-500 relative overflow-hidden`}
         >
-          {/* Illuminated User Photo Layer inside Orb */}
-          {photoUrl && (
+          {/* Illuminated 3D Mesh OR User Photo Layer inside Orb */}
+          {activeMeshUrl ? (
+            <div className="absolute inset-0 rounded-full overflow-hidden">
+              <AvatarViewer avatarUrl={activeMeshUrl} />
+            </div>
+          ) : photoUrl ? (
             <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
               <img
                 src={photoUrl}
@@ -63,17 +77,19 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20" />
             </div>
-          )}
+          ) : null}
 
-          <div className="absolute inset-2 rounded-full bg-black/35 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-2 z-10">
-            <Sparkles className={`w-5 h-5 mb-1 ${tier.textCol} animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]`} />
-            <span className="font-mono text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-              {auraLevel}
-            </span>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-white/90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.9)]">
-              AURA
-            </span>
-          </div>
+          {!activeMeshUrl && (
+            <div className="absolute inset-2 rounded-full bg-black/35 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-2 z-10 pointer-events-none">
+              <Sparkles className={`w-5 h-5 mb-1 ${tier.textCol} animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]`} />
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+                {auraLevel}
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-white/90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.9)]">
+                AURA
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

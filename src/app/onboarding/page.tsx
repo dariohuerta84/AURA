@@ -6,6 +6,8 @@ import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Ch
 import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 type Question = {
   id: string;
@@ -226,6 +228,35 @@ export default function OnboardingPage() {
     setIsCameraActive(false);
   };
 
+  const generateUploadUrl = useMutation(api.avatars.generateUploadUrl);
+  const createAvatarJob = useMutation(api.avatars.createAvatarJob);
+  const [is3DGenerating, setIs3DGenerating] = useState(false);
+
+  const uploadPhotoToConvex = async (blob: Blob) => {
+    try {
+      setIs3DGenerating(true);
+      let uploadUrl = await generateUploadUrl();
+      if (typeof window !== "undefined" && window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+        uploadUrl = uploadUrl.replace("127.0.0.1", window.location.hostname).replace("localhost", window.location.hostname);
+      }
+
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": "image/jpeg" },
+        body: blob,
+      });
+
+      if (res.ok) {
+        const { storageId } = await res.json();
+        await createAvatarJob({ photoStorageId: storageId });
+      }
+    } catch (err) {
+      console.error("Error triggering 3D avatar job:", err);
+    } finally {
+      setIs3DGenerating(false);
+    }
+  };
+
   const captureCameraPhoto = () => {
     if (!videoRef.current) return;
     const canvas = document.createElement("canvas");
@@ -241,6 +272,10 @@ export default function OnboardingPage() {
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     setPhotoUrl(dataUrl);
     stopCamera();
+
+    canvas.toBlob((blob) => {
+      if (blob) uploadPhotoToConvex(blob);
+    }, "image/jpeg", 0.85);
   };
 
   // Canvas image compression for gallery file upload
@@ -274,7 +309,12 @@ export default function OnboardingPage() {
         canvas.width = width;
         canvas.height = height;
         ctx?.drawImage(img, 0, 0, width, height);
-        setPhotoUrl(canvas.toDataURL("image/jpeg", 0.85));
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        setPhotoUrl(dataUrl);
+
+        canvas.toBlob((blob) => {
+          if (blob) uploadPhotoToConvex(blob);
+        }, "image/jpeg", 0.85);
       };
     };
   };

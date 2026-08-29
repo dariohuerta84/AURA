@@ -1,0 +1,1 @@
+{"version":3,"file":"query_options.d.ts","sourceRoot":"","sources":["../../../src/browser/query_options.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,YAAY,EAAE,iBAAiB,EAAE,MAAM,kBAAkB,CAAC;AAExE;;;;;;GAMG;AACH,MAAM,MAAM,YAAY,CAAC,KAAK,SAAS,iBAAiB,CAAC,OAAO,CAAC,IAAI;IACnE;;OAEG;IACH,KAAK,EAAE,KAAK,CAAC;IACb;;OAEG;IACH,IAAI,EAAE,YAAY,CAAC,KAAK,CAAC,CAAC;CAC3B,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"agentsmd.d.ts","sourceRoot":"","sources":["../../../../src/cli/codegen_templates/agentsmd.ts"],"names":[],"mappings":"AAAA,eAAO,MAAM,sBAAsB,6BAA6B,CAAC;AACjE,eAAO,MAAM,oBAAoB,2BAA2B,CAAC;AAE7D,wBAAgB,oBAAoB,CAAC,SAAS,EAAE,MAAM,GAAG,MAAM,CAW9D;AAED;;;;GAIG;AACH,wBAAgB,qBAAqB,CAAC,SAAS,EAAE,MAAM,GAAG,MAAM,CAM/D"}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../src/cli/deploymentToken.ts"],
+  "sourcesContent": ["import { Command } from \"@commander-js/extra-typings\";\nimport { deploymentTokenCreate } from \"./deploymentTokenCreate.js\";\nimport { deploymentTokenDelete } from \"./deploymentTokenDelete.js\";\n\nexport const deploymentToken = new Command(\"token\")\n  .summary(\"Manage access tokens\")\n  .description(\n    \"Create and delete access tokens. Currently supports deploy keys.\",\n  )\n  .addCommand(deploymentTokenCreate)\n  .addCommand(deploymentTokenDelete);\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,2BAAwB;AACxB,mCAAsC;AACtC,mCAAsC;AAE/B,MAAM,kBAAkB,IAAI,6BAAQ,OAAO,EAC/C,QAAQ,sBAAsB,EAC9B;AAAA,EACC;AACF,EACC,WAAW,kDAAqB,EAChC,WAAW,kDAAqB;",
+  "names": []
+}
