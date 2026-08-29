@@ -248,14 +248,14 @@ export default function HabitMatchPage() {
   return (
     <div className="flex-1 flex flex-col justify-between p-5 min-h-screen relative pb-28">
       {/* Header */}
-      <div className="flex items-center justify-between py-2 border-b border-white/10">
-        <div>
+      <div className="flex items-center justify-between gap-2 py-2 border-b border-white/10">
+        <div className="min-w-0 flex-1">
           <span className="text-[10px] uppercase font-bold tracking-widest text-amber-400 flex items-center gap-1">
             <Flame className="w-3 h-3 fill-amber-400" /> AURA HABIT MATCH
           </span>
-          <h1 className="text-base font-extrabold text-white">Comunidad de Hábitos</h1>
+          <h1 className="text-base font-extrabold text-white truncate">Comunidad de Hábitos</h1>
         </div>
-        <div className="text-xs px-2.5 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 font-medium">
+        <div className="text-[11px] px-2.5 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 font-medium shrink-0">
           {currentUser.category === "salud_mental" ? "🧠 Salud Emocional" : "💪 Salud Física"}
         </div>
       </div>
@@ -332,7 +332,7 @@ export default function HabitMatchPage() {
 
       {/* MATCH POPUP MODAL */}
       {matchedCandidate && !showChatModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300 max-w-md mx-auto">
           <div className="w-full max-w-sm glass-card p-6 rounded-3xl border border-purple-500/40 text-center relative shadow-2xl flex flex-col items-center space-y-4">
             <div className="relative my-2">
               <Sparkles className="w-8 h-8 text-amber-300 absolute -top-4 -right-4 animate-bounce" />
@@ -401,7 +401,7 @@ export default function HabitMatchPage() {
 
       {/* REAL CHAT MODAL */}
       {matchedCandidate && showChatModal && (
-        <div className="fixed inset-0 z-50 bg-[#0A0A1A] flex flex-col justify-between animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-[60] bg-[#0A0A1A] flex flex-col justify-between animate-in slide-in-from-bottom duration-300 max-w-md mx-auto">
           {/* Chat Header */}
           <div className="p-4 border-b border-white/10 bg-[#0D0D24] flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -448,7 +448,7 @@ export default function HabitMatchPage() {
               return (
                 <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                   <div
-                    className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-lg ${
+                    className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-lg break-words ${
                       isMe
                         ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-br-none"
                         : "glass-card text-white/90 border-purple-500/30 rounded-bl-none"
@@ -474,7 +474,7 @@ export default function HabitMatchPage() {
           </div>
 
           {/* Chat Input Bar */}
-          <div className="p-3 border-t border-white/10 bg-[#0D0D24] flex items-center gap-2">
+          <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-[#0D0D24] flex items-center gap-2">
             <input
               type="text"
               placeholder={`Escribe a ${matchedCandidate.nombre}...`}

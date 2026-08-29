@@ -1,83 +1,26 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { generateFuturesWithAI } from "@/lib/aiProvider";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { user, habitsCount = 5 } = body;
+    const { user } = body;
 
     if (!user || !user.name) {
       return NextResponse.json({ error: "Faltan datos del usuario" }, { status: 400 });
     }
 
-    const apiKey = process.env.GOOGLE_API_KEY;
-
-    if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-
-        const prompt = `Eres el motor de Inteligencia Artificial de la aplicación AURA (basada en psicología del comportamiento).
-Tu objetivo es analizar la meta personal del usuario y su evaluación actual, y generar:
-1. DOS proyecciones narrativas futuristas cortas (máximo 65 palabras cada una) en segunda persona ("tú").
-2. CINCO micro-hábitos atómicos y súper concretos diseñados para ayudarle a alcanzar su meta específica: "${user.goal}".
-
-DATOS DEL USUARIO:
-- Nombre: ${user.name}
-- Meta personal escrita: "${user.goal}"
-- Categoría: ${user.category === "salud_mental" ? "Salud Emocional" : "Salud Física"}
-- Nivel de Aura Actual: ${user.auraLevel || 50}/100
-
-INSTRUCCIONES DE LOS HÁBITOS:
-- Deben ser prácticos, diarios y directamente alineados con su meta ("${user.goal}").
-- Incluye 2 hábitos 'easy' (5 pts), 2 hábitos 'normal' (8 pts) y 1 hábito 'hard' (12 pts).
-
-Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
-{
-  "darkFuture": "Escena en 90 días si posterga su meta...",
-  "brightFuture": "Escena en 90 días si sostiene su disciplina...",
-  "habits": [
-    { "title": "Hábito 1 alineado", "difficulty": "easy", "auraPoints": 5 },
-    { "title": "Hábito 2 alineado", "difficulty": "easy", "auraPoints": 5 },
-    { "title": "Hábito 3 alineado", "difficulty": "normal", "auraPoints": 8 },
-    { "title": "Hábito 4 alineado", "difficulty": "normal", "auraPoints": 8 },
-    { "title": "Hábito 5 alineado", "difficulty": "hard", "auraPoints": 12 }
-  ]
-}`;
-
-        let rawText = "";
-        try {
-          const response = await ai.models.generateContent({
-            model: "gemini-3.6-flash",
-            contents: prompt,
-          });
-          rawText = response.text?.trim() || "";
-        } catch (mErr) {
-          console.warn("Primary model error, retrying fallback model", mErr);
-          const fallbackResponse = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
-            contents: prompt,
-          });
-          rawText = fallbackResponse.text?.trim() || "";
-        }
-
-        if (rawText) {
-          const cleanedText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(cleanedText);
-
-          if (parsed.darkFuture && parsed.brightFuture) {
-            return NextResponse.json({
-              darkFuture: parsed.darkFuture,
-              brightFuture: parsed.brightFuture,
-              habits: parsed.habits && Array.isArray(parsed.habits) ? parsed.habits : [],
-            });
-          }
-        }
-      } catch (sdkError) {
-        console.error("Error consultando la API de Gemini vía SDK", sdkError);
-      }
+    // Try AI generation (OpenAI / OpenCode / Gemini)
+    const aiResult = await generateFuturesWithAI(user);
+    if (aiResult) {
+      return NextResponse.json({
+        darkFuture: aiResult.darkFuture,
+        brightFuture: aiResult.brightFuture,
+        habits: aiResult.habits || [],
+      });
     }
 
-    // Dynamic fallback matching user goal
+    // Dynamic fallback matching user goal if API keys missing/failing
     const isMental = user.category === "salud_mental";
     const darkText = isMental
       ? `En noventa días, ${user.name}, la constante postergación de tus momentos de pausa hace que la tensión del día se acumule. La meta de "${user.goal}" se percibe cada vez más distante si no estableces tus límites hoy.`

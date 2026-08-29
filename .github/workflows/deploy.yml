@@ -66,7 +66,7 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 3 \
-            --set-env-vars "NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }},NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }},CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}"
+            --set-env-vars "NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }},NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }},CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},OPENCODE_API_KEY=${{ secrets.OPENCODE_API_KEY }},OPENCODE_BASE_URL=${{ secrets.OPENCODE_BASE_URL }},OPENCODE_MODEL=${{ secrets.OPENCODE_MODEL }}"
 
       - name: Print deployed URL
         run: |
