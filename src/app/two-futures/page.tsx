@@ -115,7 +115,7 @@ export default function TwoFuturesPage() {
 
         <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs uppercase tracking-widest">
           <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-          <span>Dos Futuros (Gemini 2.5 Flash)</span>
+          <span>Dos Futuros (Gemini 3.6 Flash)</span>
         </div>
 
         <button
@@ -134,7 +134,7 @@ export default function TwoFuturesPage() {
         {isGenerating || !futures ? (
           <div className="flex flex-col items-center justify-center p-12 text-center gap-4">
             <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-cyan-400 animate-spin" />
-            <h2 className="text-base font-bold text-white">Consultando a Gemini 2.5 Flash...</h2>
+            <h2 className="text-base font-bold text-white">Consultando a Gemini 3.6 Flash...</h2>
             <p className="text-xs text-white/50 max-w-xs">
               Sintonizando tu meta: &quot;{user.goal}&quot;
             </p>
