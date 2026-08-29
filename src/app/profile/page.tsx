@@ -7,19 +7,59 @@ import { getStoredUser, getStoredHabits, saveStoredUser, UserProfile, Habit } fr
 import { BottomNav } from "@/components/BottomNav";
 import { SignInButton, UserButton, useUser, useClerk } from "@clerk/nextjs";
 
-export default function ProfilePage() {
-  const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
-  const { openSignIn } = useClerk();
-  const [user, setUser] = useState<UserProfile | null>(null);
+function ClerkAccountSection({ user, handleResetProfile }: { user: UserProfile; handleResetProfile: () => void }) {
+  let isSignedIn = false;
+  let isLoaded = false;
+  let openSignIn: any = null;
+
+  try {
+    const clerkUser = useUser();
+    const clerk = useClerk();
+    isSignedIn = Boolean(clerkUser.isSignedIn);
+    isLoaded = Boolean(clerkUser.isLoaded);
+    openSignIn = clerk.openSignIn;
+  } catch {
+    // Clerk not configured
+  }
 
   const handleOpenSignIn = () => {
-    try {
-      openSignIn({ fallbackRedirectUrl: "/profile" });
-    } catch (e) {
-      console.error("Clerk openSignIn error", e);
+    if (openSignIn) {
+      try {
+        openSignIn({ fallbackRedirectUrl: "/profile" });
+      } catch (e) {
+        console.error("Clerk openSignIn error", e);
+      }
     }
   };
+
+  return (
+    <div className="flex items-center gap-2">
+      {isLoaded && isSignedIn ? (
+        <UserButton />
+      ) : (
+        <button
+          type="button"
+          onClick={handleOpenSignIn}
+          className="text-xs px-2.5 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 font-medium hover:text-white transition-all cursor-pointer"
+        >
+          ✦ Sincronizar Cuenta
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleResetProfile}
+        className="text-xs text-white/40 hover:text-red-400 flex items-center gap-1 transition-colors pl-1"
+        title="Reiniciar perfil"
+      >
+        <RefreshCw className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+export default function ProfilePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
 
   useEffect(() => {
@@ -57,27 +97,7 @@ export default function ProfilePage() {
       {/* Header with Clerk Account Sync */}
       <div className="flex items-center justify-between pb-3 border-b border-white/10">
         <h1 className="text-base font-bold text-white tracking-wide">Tu Viaje de Aura</h1>
-        <div className="flex items-center gap-2">
-          {isLoaded && isSignedIn ? (
-            <UserButton />
-          ) : (
-            <button
-              type="button"
-              onClick={handleOpenSignIn}
-              className="text-xs px-2.5 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 font-medium hover:text-white transition-all cursor-pointer"
-            >
-              ✦ Sincronizar Cuenta
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleResetProfile}
-            className="text-xs text-white/40 hover:text-red-400 flex items-center gap-1 transition-colors pl-1"
-            title="Reiniciar perfil"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ClerkAccountSection user={user} handleResetProfile={handleResetProfile} />
       </div>
 
       {/* Profile Card & Streak Badge */}

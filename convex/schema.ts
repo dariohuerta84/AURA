@@ -117,4 +117,13 @@ export default defineSchema({
     brightImageUrl: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_user_date", ["userId", "date"]),
+
+  avatars: defineTable({
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    photoStorageId: v.id("_storage"),
+    meshStorageId: v.optional(v.id("_storage")),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  }).index("by_status", ["status"]),
 });

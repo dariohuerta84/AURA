@@ -174,7 +174,7 @@ export const generateAuraImage = action({
           size: "1024x1792",
         });
 
-        const imageUrl = response.data[0]?.url;
+        const imageUrl = response.data?.[0]?.url;
         if (imageUrl) {
           await ctx.runMutation(api.users.updateAuraImage, {
             userId: args.userId,
