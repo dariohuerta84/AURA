@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles, Flame, Plus, Brain, Activity, CheckCircle2, Loader2, Target, X } from "lucide-react";
+import { Sparkles, Flame, Plus, Brain, Activity, CheckCircle2, Loader2, Target, X, PlusCircle, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, getStoredHabits, saveStoredHabits, saveStoredUser, saveStoredFutures, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import { HabitCard } from "@/components/HabitCard";
 import { BottomNav } from "@/components/BottomNav";
+import confetti from "canvas-confetti";
 
 function HabitSkeletonCard() {
   return (
@@ -31,11 +32,54 @@ export default function HomePage() {
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [isGeneratingAiHabits, setIsGeneratingAiHabits] = useState(false);
 
-  // Goal & Add Habit Modal State
+  // Modal 1: Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [newGoalInput, setNewGoalInput] = useState("");
-  const [customHabitTitle, setCustomHabitTitle] = useState("");
   const [isGeneratingGoalHabits, setIsGeneratingGoalHabits] = useState(false);
+
+  // Modal 2: Add Habit Modal State
+  const [showAddHabitModal, setShowAddHabitModal] = useState(false);
+  const [customHabitTitle, setCustomHabitTitle] = useState("");
+  const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "normal" | "hard">("normal");
+  const [isGeneratingSingleHabit, setIsGeneratingSingleHabit] = useState(false);
+
+  // Dynamic Aura recalculation based on total habits and completion ratio
+  const calculateAuraLevel = (updatedHabits: Habit[], currentUser: UserProfile) => {
+    const totalPossiblePoints = updatedHabits.reduce(
+      (sum, h) => sum + (h.auraPoints || (h.difficulty === "easy" ? 5 : h.difficulty === "normal" ? 8 : 12)),
+      0
+    );
+    const earnedPointsToday = updatedHabits
+      .filter((h) => h.completedToday)
+      .reduce(
+        (sum, h) => sum + (h.auraPoints || (h.difficulty === "easy" ? 5 : h.difficulty === "normal" ? 8 : 12)),
+        0
+      );
+
+    const ratio = totalPossiblePoints > 0 ? earnedPointsToday / totalPossiblePoints : 0;
+    const streakBonus = Math.min(15, currentUser.currentStreak * 2);
+
+    return Math.min(100, Math.max(15, 15 + Math.round(ratio * 70) + streakBonus));
+  };
+
+  const handleToggleHabit = (id: string) => {
+    if (!user) return;
+
+    const updated = habits.map((h) => {
+      if (h.id === id) {
+        return { ...h, completedToday: !h.completedToday };
+      }
+      return h;
+    });
+
+    setHabits(updated);
+    saveStoredHabits(updated);
+
+    const newAuraLevel = calculateAuraLevel(updated, user);
+    const updatedUser = { ...user, auraLevel: newAuraLevel };
+    setUser(updatedUser);
+    saveStoredUser(updatedUser);
+  };
 
   const handleReplaceHabit = async (id: string) => {
     if (!user || replacingId) return;
@@ -74,6 +118,11 @@ export default function HomePage() {
           const updated = habits.map((h) => (h.id === id ? newHabit : h));
           setHabits(updated);
           saveStoredHabits(updated);
+
+          const newAura = calculateAuraLevel(updated, user);
+          const updatedUser = { ...user, auraLevel: newAura };
+          setUser(updatedUser);
+          saveStoredUser(updatedUser);
         }
       }
     } catch (e) {
@@ -129,31 +178,7 @@ export default function HomePage() {
     }
   }, [router]);
 
-  const handleToggleHabit = (id: string) => {
-    if (!user) return;
-
-    const updated = habits.map((h) => {
-      if (h.id === id) {
-        return { ...h, completedToday: !h.completedToday };
-      }
-      return h;
-    });
-
-    setHabits(updated);
-    saveStoredHabits(updated);
-
-    const completedCount = updated.filter((h) => h.completedToday).length;
-    const totalCount = updated.length || 1;
-    const ratio = completedCount / totalCount;
-    const streakBonus = Math.min(15, user.currentStreak * 2);
-
-    const newAuraLevel = Math.min(100, Math.max(10, Math.round(30 + ratio * 55 + streakBonus)));
-
-    const updatedUser = { ...user, auraLevel: newAuraLevel };
-    setUser(updatedUser);
-    saveStoredUser(updatedUser);
-  };
-
+  // Handler for Modal 1: Updating Goal & Generating 5 AI Habits
   const handleSaveNewGoalAndHabits = async () => {
     if (!newGoalInput.trim() || !user) return;
 
@@ -182,6 +207,9 @@ export default function HomePage() {
 
           setHabits(aiHabits);
           saveStoredHabits(aiHabits);
+
+          const newAura = calculateAuraLevel(aiHabits, updatedUser);
+          updatedUser.auraLevel = newAura;
         }
 
         if (data.darkFuture && data.brightFuture) {
@@ -200,27 +228,95 @@ export default function HomePage() {
       saveStoredUser(updatedUser);
       setIsGeneratingGoalHabits(false);
       setShowGoalModal(false);
+
+      try {
+        confetti({
+          particleCount: 60,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
+        });
+      } catch {
+        // fallback
+      }
+    }
+  };
+
+  // Handler for Modal 2: Adding 1 Single Habit (AI or Manual)
+  const handleGenerateSingleHabitWithAI = async () => {
+    if (!user) return;
+    setIsGeneratingSingleHabit(true);
+
+    try {
+      const existingTitles = habits.map((h) => h.title);
+      const res = await fetch("/api/replace-habit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user,
+          targetDifficulty: habitDifficulty,
+          existingTitles,
+          oldHabitTitle: user.goal,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) {
+          const auraPoints = habitDifficulty === "easy" ? 5 : habitDifficulty === "normal" ? 8 : 12;
+          const newHabit: Habit = {
+            id: `ai_add_${Date.now()}`,
+            title: data.title,
+            category: user.category,
+            isDefault: false,
+            difficulty: habitDifficulty,
+            auraPoints,
+            completedToday: false,
+          };
+
+          const updated = [...habits, newHabit];
+          setHabits(updated);
+          saveStoredHabits(updated);
+
+          const newAura = calculateAuraLevel(updated, user);
+          const updatedUser = { ...user, auraLevel: newAura };
+          setUser(updatedUser);
+          saveStoredUser(updatedUser);
+        }
+      }
+    } catch (e) {
+      console.error("Error al generar hábito único", e);
+    } finally {
+      setIsGeneratingSingleHabit(false);
+      setShowAddHabitModal(false);
     }
   };
 
   const handleAddManualHabit = () => {
     if (!customHabitTitle.trim() || !user) return;
 
+    const auraPoints = habitDifficulty === "easy" ? 5 : habitDifficulty === "normal" ? 8 : 12;
     const newHabit: Habit = {
       id: `man_${Date.now()}`,
       title: customHabitTitle.trim(),
       category: user.category,
       isDefault: false,
-      difficulty: "normal",
-      auraPoints: 8,
+      difficulty: habitDifficulty,
+      auraPoints,
       completedToday: false,
     };
 
     const updated = [...habits, newHabit];
     setHabits(updated);
     saveStoredHabits(updated);
+
+    const newAura = calculateAuraLevel(updated, user);
+    const updatedUser = { ...user, auraLevel: newAura };
+    setUser(updatedUser);
+    saveStoredUser(updatedUser);
+
     setCustomHabitTitle("");
-    setShowGoalModal(false);
+    setShowAddHabitModal(false);
   };
 
   if (!user) {
@@ -277,7 +373,7 @@ export default function HomePage() {
         <AuraOrb auraLevel={user.auraLevel} streak={user.currentStreak} photoUrl={user.photoUrl} size="md" showDetails={true} />
       </div>
 
-      {/* Primary WOW Action Button: Dos Futuros */}
+      {/* Primary Action Button: Dos Futuros */}
       <div className="my-2">
         <Link
           href="/two-futures"
@@ -305,16 +401,17 @@ export default function HomePage() {
             &quot;{user.goal}&quot;
           </p>
         </div>
+        {/* BUTTON 1: NUEVA META */}
         <button
           type="button"
           onClick={() => {
             setNewGoalInput(user.goal);
             setShowGoalModal(true);
           }}
-          className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer hover:scale-105"
+          className="px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-400/50 text-white text-xs font-bold shadow-md flex items-center gap-1 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-all"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Nueva Meta</span>
+          <Target className="w-3.5 h-3.5" />
+          <span>+ Nueva Meta</span>
         </button>
       </div>
 
@@ -327,12 +424,16 @@ export default function HomePage() {
               {isGeneratingAiHabits ? "..." : `${completedCount}/${habits.length}`}
             </span>
           </div>
-          {completedCount === habits.length && habits.length > 0 && !isGeneratingAiHabits && (
-            <span className="text-xs font-semibold text-cyan-300 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-              ¡Completos!
-            </span>
-          )}
+
+          {/* BUTTON 2: NUEVO HÁBITO */}
+          <button
+            type="button"
+            onClick={() => setShowAddHabitModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer hover:scale-105 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span>+ Nuevo Hábito</span>
+          </button>
         </div>
 
         <div className="space-y-2.5">
@@ -366,19 +467,19 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Modal: Agregar / Editar Meta e Hábitos IA */}
+      {/* MODAL 1: NUEVA META PERSONAL */}
       {showGoalModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-200">
           <div className="w-full max-w-sm glass-card p-5 rounded-3xl border border-purple-500/40 shadow-2xl relative space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-bold text-white">Nueva Meta u Objetivo</h3>
+                <h3 className="text-sm font-bold text-white">Cambiar Meta Personal</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowGoalModal(false)}
-                className="p-1 rounded-full glass-card text-white/50 hover:text-white"
+                className="p-1 rounded-full glass-card text-white/50 hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -386,7 +487,7 @@ export default function HomePage() {
 
             <div className="space-y-2">
               <label className="text-xs text-white/70 font-medium block">
-                Escribe tu meta en tus palabras:
+                Escribe tu nueva meta en tus palabras:
               </label>
               <textarea
                 rows={3}
@@ -406,28 +507,99 @@ export default function HomePage() {
               {isGeneratingGoalHabits ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Generando hábitos con IA...</span>
+                  <span>Generando 5 Hábitos con IA...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                  <span>Generar 5 Hábitos con IA</span>
+                  <span>Generar 5 Hábitos para esta Meta ✨</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: NUEVO HÁBITO INDIVIDUAL */}
+      {showAddHabitModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm glass-card p-5 rounded-3xl border border-cyan-500/40 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-sm font-bold text-white">Agregar Nuevo Hábito</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddHabitModal(false)}
+                className="p-1 rounded-full glass-card text-white/50 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Difficulty Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-white/70 font-semibold block uppercase tracking-wider">
+                Dificultad y Puntos de Aura:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: "easy", label: "Fácil", pts: "+5 pts", col: "border-cyan-500/40 text-cyan-300" },
+                  { key: "normal", label: "Normal", pts: "+8 pts", col: "border-purple-500/40 text-purple-300" },
+                  { key: "hard", label: "Desafío", pts: "+12 pts", col: "border-amber-500/40 text-amber-300" },
+                ].map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() => setHabitDifficulty(d.key as any)}
+                    className={`py-2 px-1 rounded-xl border text-center transition-all ${
+                      habitDifficulty === d.key
+                        ? "glass-card-active text-white border-cyan-400"
+                        : "glass-card text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <div className="text-xs font-bold">{d.label}</div>
+                    <div className={`text-[10px] font-mono ${d.col}`}>{d.pts}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Option A: AI Single Habit Generator */}
+            <button
+              type="button"
+              onClick={handleGenerateSingleHabitWithAI}
+              disabled={isGeneratingSingleHabit}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-600 to-purple-600 text-white font-bold text-xs tracking-wide shadow-lg disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              {isGeneratingSingleHabit ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-300" />
+                  <span>Generando hábito con IA...</span>
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4 text-cyan-300" />
+                  <span>✨ Generar 1 Hábito con IA</span>
                 </>
               )}
             </button>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-white/10"></div>
-              <span className="flex-shrink mx-2 text-[10px] text-white/40 uppercase tracking-widest font-semibold">o añadir hábito manual</span>
+              <span className="flex-shrink mx-2 text-[10px] text-white/40 uppercase tracking-widest font-semibold">o ingresar manual</span>
               <div className="flex-grow border-t border-white/10"></div>
             </div>
 
+            {/* Option B: Custom Manual Input */}
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Nombre de hábito personalizado..."
+                placeholder="Nombre del hábito..."
                 value={customHabitTitle}
                 onChange={(e) => setCustomHabitTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddManualHabit()}
                 className="flex-1 px-3 py-2.5 glass-input text-xs text-white"
               />
               <button
