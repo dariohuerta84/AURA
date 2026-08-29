@@ -1,12 +1,11 @@
-# Stage 1: Install deps
-FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat
+# Stage 1: Install deps with bun
+FROM oven/bun:1.2 AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile
 
-# Stage 2: Build
+# Stage 2: Build with Node (Next.js standalone output)
 FROM node:22-alpine AS builder
 WORKDIR /app
 
@@ -21,7 +20,7 @@ ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN npx next build
 
 # Stage 3: Production runner
 FROM node:22-alpine AS runner
