@@ -39,13 +39,35 @@ navegador → Convex (BD + storage + scheduler) → ngrok → tu PC (TripoSR)
    git clone https://github.com/VAST-AI-Research/TripoSR
    cd TripoSR
    python3.10 -m venv .venv
-   .venv/Scripts/python.exe -m pip install --upgrade setuptools
-   .venv/Scripts/python.exe -m pip install -r requirements.txt
+   source .venv/bin/activate          # Linux / macOS
+   # .venv\Scriptsctivate          # Windows
+   pip install --upgrade pip setuptools wheel
+   ```
+
+   **NO corras `pip install -r requirements.txt` tal cual: se cuelga.**
+   Ese archivo fija versiones viejas (`transformers==4.35.0`, `Pillow==10.1.0`,
+   `omegaconf==2.3.0`) pero deja `gradio` sin fijar. pip instala el gradio mas
+   nuevo, que exige versiones modernas de esas mismas librerias, y entra en
+   backtracking: imprime miles de lineas probando versiones de
+   `antlr4-python3-runtime` buscando una combinacion que no existe.
+
+   `gradio` solo lo usa el demo web de TripoSR. Nosotros llamamos a `run.py`,
+   asi que se omite. Instala en este orden:
+
+   ```bash
+   # a) torch primero, con la build de CUDA de tu GPU (ajusta cu121 si toca)
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+   # b) el resto, sin gradio
+   pip install omegaconf==2.3.0 Pillow einops==0.7.0 transformers==4.35.0        trimesh==4.0.5 rembg huggingface-hub "imageio[ffmpeg]"        xatlas==0.0.9 moderngl==5.10.0
+
+   # c) torchmcubes al final: compila, necesita el toolkit de CUDA instalado
+   pip install git+https://github.com/tatsy/torchmcubes.git
    ```
 
 3. **Antes que nada**, correr TripoSR a mano una vez:
    ```bash
-   .venv/Scripts/python.exe run.py examples/chair.png --output-dir output/ --device cuda
+   python run.py examples/chair.png --output-dir output/ --device cuda
    ```
    La primera ejecución descarga ~1.4GB de pesos desde Hugging Face. Hay que
    dejarlos cacheados AHORA: si esa descarga ocurre dentro de una petición
