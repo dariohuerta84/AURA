@@ -2,14 +2,242 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, HeartPulse } from "lucide-react";
+import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Check } from "lucide-react";
 import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
 
+type Question = {
+  id: string;
+  title: string;
+  options: { label: string; pts: number }[];
+};
+
+const EMOTIONAL_QUESTIONS: Question[] = [
+  {
+    id: "mood",
+    title: "1. ¿Cómo ha sido tu estado de ánimo esta semana?",
+    options: [
+      { label: "Muy positivo", pts: 20 },
+      { label: "Estable", pts: 15 },
+      { label: "Variable", pts: 5 },
+      { label: "Bajo", pts: 0 },
+    ],
+  },
+  {
+    id: "anxiety",
+    title: "2. ¿Con qué frecuencia sientes estrés o ansiedad?",
+    options: [
+      { label: "Casi nunca", pts: 20 },
+      { label: "A veces", pts: 15 },
+      { label: "Frecuente", pts: 5 },
+      { label: "Casi siempre", pts: 0 },
+    ],
+  },
+  {
+    id: "connection",
+    title: "3. ¿Qué tan conectado/a te sientes con personas cercanas?",
+    options: [
+      { label: "Muy conectado", pts: 20 },
+      { label: "Conectado", pts: 15 },
+      { label: "Algo distante", pts: 5 },
+      { label: "Aislado", pts: 0 },
+    ],
+  },
+  {
+    id: "mentalEnergy",
+    title: "4. ¿Tienes claridad y energía mental para tus tareas diarias?",
+    options: [
+      { label: "Mucha energía", pts: 20 },
+      { label: "Suficiente", pts: 15 },
+      { label: "Poca energía", pts: 5 },
+      { label: "Casi nada", pts: 0 },
+    ],
+  },
+  {
+    id: "satisfaction",
+    title: "5. ¿Qué tan satisfecho/a estás con tu vida ahora mismo?",
+    options: [
+      { label: "Muy satisfecho", pts: 20 },
+      { label: "Satisfecho", pts: 15 },
+      { label: "Poco satisfecho", pts: 5 },
+      { label: "Insatisfecho", pts: 0 },
+    ],
+  },
+  {
+    id: "disconnect",
+    title: "6. ¿Logras desconectar tu mente al final de la jornada?",
+    options: [
+      { label: "Fácilmente", pts: 20 },
+      { label: "A veces", pts: 15 },
+      { label: "Me cuesta bastante", pts: 5 },
+      { label: "Imposible", pts: 0 },
+    ],
+  },
+  {
+    id: "selfTalk",
+    title: "7. ¿Cómo es tu diálogo interno cuando las cosas no salen bien?",
+    options: [
+      { label: "Comprensivo y amable", pts: 20 },
+      { label: "Neutro / Resolutivo", pts: 15 },
+      { label: "Crítico", pts: 5 },
+      { label: "Muy duro conmigo", pts: 0 },
+    ],
+  },
+];
+
+const PHYSICAL_QUESTIONS: Question[] = [
+  {
+    id: "physEnergy",
+    title: "1. ¿Cómo calificarías tu nivel de energía física diaria?",
+    options: [
+      { label: "Alta y constante", pts: 20 },
+      { label: "Buena", pts: 15 },
+      { label: "Baja", pts: 5 },
+      { label: "Muy baja / Fatiga", pts: 0 },
+    ],
+  },
+  {
+    id: "sleep",
+    title: "2. ¿Cómo describirías la calidad de tu descanso nocturno?",
+    options: [
+      { label: "Excelente y reparador", pts: 20 },
+      { label: "Bien", pts: 15 },
+      { label: "Regular / Entrecortado", pts: 5 },
+      { label: "Mal / Insomnio", pts: 0 },
+    ],
+  },
+  {
+    id: "exercise",
+    title: "3. ¿Con qué frecuencia haces actividad física o ejercicio?",
+    options: [
+      { label: "Casi a diario", pts: 20 },
+      { label: "3-4 veces por semana", pts: 15 },
+      { label: "Ocasional", pts: 5 },
+      { label: "Casi nada / Sedentario", pts: 0 },
+    ],
+  },
+  {
+    id: "diet",
+    title: "4. ¿Cómo percibes tu alimentación general?",
+    options: [
+      { label: "Muy equilibrada", pts: 20 },
+      { label: "Bastante bien", pts: 15 },
+      { label: "Irregular", pts: 5 },
+      { label: "Descuidada", pts: 0 },
+    ],
+  },
+  {
+    id: "pain",
+    title: "5. ¿Sientes dolores de cabeza o molestias corporales?",
+    options: [
+      { label: "Casi nunca", pts: 20 },
+      { label: "A veces", pts: 15 },
+      { label: "Frecuentes", pts: 5 },
+      { label: "Casi siempre", pts: 0 },
+    ],
+  },
+  {
+    id: "hydration",
+    title: "6. ¿Mantienes buena hidratación y cuidado corporal diario?",
+    options: [
+      { label: "Excelente", pts: 20 },
+      { label: "Adecuada", pts: 15 },
+      { label: "Regular", pts: 5 },
+      { label: "Muy deficiente", pts: 0 },
+    ],
+  },
+  {
+    id: "stamina",
+    title: "7. ¿Cómo llegas al final de tu día físicamente?",
+    options: [
+      { label: "Con energía", pts: 20 },
+      { label: "Cansancio normal", pts: 15 },
+      { label: "Bastante agotado", pts: 5 },
+      { label: "Extenuado / Sin fuerzas", pts: 0 },
+    ],
+  },
+];
+
+const PRODUCTIVITY_QUESTIONS: Question[] = [
+  {
+    id: "focus",
+    title: "1. ¿Qué tan fácil mantienes el enfoque sin distraerte?",
+    options: [
+      { label: "Muy fácil", pts: 20 },
+      { label: "Bien", pts: 15 },
+      { label: "Me distraigo a menudo", pts: 5 },
+      { label: "Casi imposible", pts: 0 },
+    ],
+  },
+  {
+    id: "planning",
+    title: "2. ¿Planificas tus prioridades antes de empezar el día?",
+    options: [
+      { label: "Siempre", pts: 20 },
+      { label: "La mayoría de veces", pts: 15 },
+      { label: "Rara vez", pts: 5 },
+      { label: "Nunca", pts: 0 },
+    ],
+  },
+  {
+    id: "procrastination",
+    title: "3. ¿Sueles postergar tareas clave por indecisión?",
+    options: [
+      { label: "Casi nunca", pts: 20 },
+      { label: "A veces", pts: 15 },
+      { label: "Frecuentemente", pts: 5 },
+      { label: "Siempre", pts: 0 },
+    ],
+  },
+  {
+    id: "completion",
+    title: "4. ¿Logras completar tus metas propuestas del día?",
+    options: [
+      { label: "Casi todo", pts: 20 },
+      { label: "La mayoría", pts: 15 },
+      { label: "La mitad", pts: 5 },
+      { label: "Muy poco", pts: 0 },
+    ],
+  },
+  {
+    id: "timeMgmt",
+    title: "5. ¿Sientes que el tiempo te rinde adecuadamente?",
+    options: [
+      { label: "Mucho", pts: 20 },
+      { label: "Bien", pts: 15 },
+      { label: "Justo", pts: 5 },
+      { label: "Siento que pierdo tiempo", pts: 0 },
+    ],
+  },
+  {
+    id: "clarity",
+    title: "6. ¿Tienes claridad sobre cuál es tu siguiente gran paso?",
+    options: [
+      { label: "Total claridad", pts: 20 },
+      { label: "Bastante claro", pts: 15 },
+      { label: "Algo dudoso", pts: 5 },
+      { label: "Muy confuso", pts: 0 },
+    ],
+  },
+  {
+    id: "fulfillment",
+    title: "7. ¿Cómo te sientes al terminar tu jornada de trabajo?",
+    options: [
+      { label: "Satisfecho/a y realizado/a", pts: 20 },
+      { label: "Tranquilo/a", pts: 15 },
+      { label: "Neutro", pts: 5 },
+      { label: "Frustrado/a", pts: 0 },
+    ],
+  },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<number>(1);
+
+  // Onboarding Overall Phase
+  // 1: Perfil General, 2: Selección Categoría, 3: Meta en tus palabras, 4: Preguntas Step-by-Step, 5: Reveal
+  const [phase, setPhase] = useState<number>(1);
 
   // Form State: General
   const [name, setName] = useState("");
@@ -17,46 +245,45 @@ export default function OnboardingPage() {
   const [gender, setGender] = useState<"male" | "female" | "prefer_not_to_say">("female");
   const [weight, setWeight] = useState<number>(65);
 
-  // Form State: Category & Goal
+  // Category & Goal
   const [category, setCategory] = useState<"salud_mental" | "salud_fisica">("salud_mental");
   const [goal, setGoal] = useState("");
 
-  // Clinical Questions: Salud Emocional (5 preguntas de Lic. María Del Pilar)
-  const [mood, setMood] = useState<number>(15); // 20: Muy positivo, 15: Estable, 5: Variable, 0: Bajo
-  const [anxietyFreq, setAnxietyFreq] = useState<number>(15); // 20: Casi nunca, 15: A veces, 5: Frecuente, 0: Casi siempre
-  const [connection, setConnection] = useState<number>(15); // 20: Muy conectado, 15: Conectado, 5: Algo distante, 0: Aislado
-  const [mentalEnergy, setMentalEnergy] = useState<number>(15); // 20: Mucha, 15: Suficiente, 5: Poca, 0: Casi nada
-  const [lifeSatisfaction, setLifeSatisfaction] = useState<number>(15); // 20: Muy satisfecho, 15: Satisfecho, 5: Poco, 0: Insatisfecho
-
-  // Clinical Questions: Salud Física (5 preguntas de Lic. María Del Pilar)
-  const [physEnergy, setPhysEnergy] = useState<number>(15); // 20: Alta, 15: Buena, 5: Baja, 0: Muy baja
-  const [sleepQuality, setSleepQuality] = useState<number>(15); // 20: Excelente, 15: Bien, 5: Regular, 0: Mal
-  const [exerciseFreq, setExerciseFreq] = useState<number>(15); // 20: Casi a diario, 15: Varias veces/sem, 5: Poca, 0: Nada
-  const [dietQuality, setDietQuality] = useState<number>(15); // 20: Muy equilibrada, 15: Bastante bien, 5: Irregular, 0: Descuidada
-  const [painFreq, setPainFreq] = useState<number>(15); // 20: Casi nunca, 15: A veces, 5: Seguido, 0: Casi siempre
+  // Step-by-Step Question Index & Answers
+  const [questionIndex, setQuestionIndex] = useState<number>(0);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
 
   // Animation State for Step 5 (Reveal)
   const [isGenerating, setIsGenerating] = useState(false);
   const [calculatedAura, setCalculatedAura] = useState(50);
 
-  const handleNext = () => {
-    if (step === 1 && !name.trim()) return;
-    if (step === 3 && !goal.trim()) return;
+  // Select questions array based on category
+  const activeQuestions =
+    category === "salud_mental" ? EMOTIONAL_QUESTIONS : PHYSICAL_QUESTIONS;
 
-    if (step === 4) {
-      // Puntuación estática determinística clínica
-      let totalScore = 50;
-      if (category === "salud_mental") {
-        totalScore = mood + anxietyFreq + connection + mentalEnergy + lifeSatisfaction;
-      } else {
-        totalScore = physEnergy + sleepQuality + exerciseFreq + dietQuality + painFreq;
-      }
+  const currentQuestion = activeQuestions[questionIndex];
 
-      const score = Math.min(100, Math.max(10, Math.round(totalScore)));
+  const handleSelectOption = (pts: number) => {
+    const updatedAnswers = { ...answers, [currentQuestion.id]: pts };
+    setAnswers(updatedAnswers);
+
+    // Auto-advance to next question smoothly
+    if (questionIndex < activeQuestions.length - 1) {
+      setTimeout(() => {
+        setQuestionIndex((prev) => prev + 1);
+      }, 200);
+    } else {
+      // Finished all 7 questions -> Calculate Aura Score & Go to Reveal Phase 5
+      let totalPts = 0;
+      Object.values(updatedAnswers).forEach((val) => {
+        totalPts += val;
+      });
+
+      const maxPossiblePts = activeQuestions.length * 20;
+      const score = Math.min(100, Math.max(15, Math.round((totalPts / maxPossiblePts) * 100)));
       setCalculatedAura(score);
 
-      // Transición al paso 5 (Reveal animado)
-      setStep(5);
+      setPhase(5);
       setIsGenerating(true);
 
       const tempUser: UserProfile = {
@@ -95,7 +322,7 @@ export default function OnboardingPage() {
         setIsGenerating(false);
         try {
           confetti({
-            particleCount: 70,
+            particleCount: 75,
             spread: 80,
             origin: { y: 0.6 },
             colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
@@ -104,10 +331,7 @@ export default function OnboardingPage() {
           // fallback
         }
       }, 2400);
-      return;
     }
-
-    setStep((prev) => prev + 1);
   };
 
   const handleFinishOnboarding = () => {
@@ -133,26 +357,35 @@ export default function OnboardingPage() {
   return (
     <div className="flex-1 flex flex-col justify-between p-5 min-h-screen relative overflow-y-auto">
       {/* Top Header Progress Bar */}
-      {step < 5 && (
-        <div className="w-full mb-4">
+      {phase < 5 && (
+        <div className="w-full mb-4 z-10">
           <div className="flex items-center justify-between text-xs text-white/50 mb-2">
             <span className="uppercase tracking-widest font-semibold text-purple-400">
-              AURA EVALUACIÓN CLÍNICA
+              EVALUACIÓN CLÍNICA ADAPTATIVA
             </span>
-            <span>Paso {step} de 4</span>
+            <span>
+              {phase === 4
+                ? `Pregunta ${questionIndex + 1} de ${activeQuestions.length}`
+                : `Paso ${phase} de 4`}
+            </span>
           </div>
           <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-gradient-to-r from-purple-500 via-cyan-400 to-amber-400 h-full transition-all duration-500"
-              style={{ width: `${(step / 4) * 100}%` }}
+              style={{
+                width:
+                  phase === 4
+                    ? `${((questionIndex + 1) / activeQuestions.length) * 100}%`
+                    : `${(phase / 4) * 100}%`,
+              }}
             />
           </div>
         </div>
       )}
 
-      {/* STEP 1: PERFIL GENERAL */}
-      {step === 1 && (
-        <div className="flex-1 flex flex-col justify-center gap-6 my-auto">
+      {/* PHASE 1: PERFIL GENERAL */}
+      {phase === 1 && (
+        <div className="flex-1 flex flex-col justify-center gap-6 my-auto z-10">
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
               ✦ Tu Perfil General ✦
@@ -177,25 +410,40 @@ export default function OnboardingPage() {
               />
             </div>
 
-            <div>
-              <label className="text-xs text-white/70 block mb-1.5 font-medium">
-                Rango de edad
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["18-24", "25-30", "31+"] as const).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setAgeRange(r)}
-                    className={`py-2.5 rounded-xl border text-xs font-medium transition-all ${
-                      ageRange === r
-                        ? "glass-card-active text-white"
-                        : "glass-card text-white/60 hover:text-white"
-                    }`}
-                  >
-                    {r} años
-                  </button>
-                ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/70 block mb-1.5 font-medium">
+                  Rango de edad
+                </label>
+                <div className="grid grid-cols-3 gap-1">
+                  {(["18-24", "25-30", "31+"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setAgeRange(r)}
+                      className={`py-2 rounded-xl border text-[11px] font-medium transition-all ${
+                        ageRange === r
+                          ? "glass-card-active text-white"
+                          : "glass-card text-white/60 hover:text-white"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/70 block mb-1.5 font-medium">
+                  Peso aprox. (kg)
+                </label>
+                <input
+                  type="number"
+                  placeholder="65"
+                  value={weight}
+                  onChange={(e) => setWeight(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 glass-input text-xs text-center font-bold"
+                />
               </div>
             </div>
 
@@ -228,71 +476,65 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* STEP 2: SELECCIÓN DE CATEGORÍA */}
-      {step === 2 && (
-        <div className="flex-1 flex flex-col justify-center gap-6 my-auto">
+      {/* PHASE 2: SELECCIÓN DE CATEGORÍA */}
+      {phase === 2 && (
+        <div className="flex-1 flex flex-col justify-center gap-5 my-auto z-10">
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
-              ¿Qué quieres elevar?
+              ¿Qué quieres elevar hoy?
             </h1>
             <p className="text-xs text-white/60">
-              Elige el eje principal de tu transformación personal.
+              Elige el eje principal de tu evaluación neuropsicológica.
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div
               onClick={() => setCategory("salud_mental")}
-              className={`p-5 cursor-pointer transition-all ${
+              className={`p-4 cursor-pointer transition-all rounded-2xl border ${
                 category === "salud_mental" ? "glass-card-active" : "glass-card"
               }`}
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-purple-500/20 text-purple-300">
                   <Brain className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">🧠 Salud Emocional</h3>
-                  <p className="text-xs text-purple-300/80">Paz interior, claridad y equilibrio</p>
+                  <h3 className="text-sm font-bold text-white">🧠 Salud Emocional</h3>
+                  <p className="text-xs text-purple-300/80">Paz interior, claridad y resiliencia</p>
                 </div>
               </div>
-              <p className="text-xs text-white/70 leading-relaxed mt-2">
-                Evaluación diseñada por neuropsicología para reducir estrés y cultivar resiliencia mental.
-              </p>
             </div>
 
             <div
               onClick={() => setCategory("salud_fisica")}
-              className={`p-5 cursor-pointer transition-all ${
+              className={`p-4 cursor-pointer transition-all rounded-2xl border ${
                 category === "salud_fisica" ? "glass-card-active" : "glass-card"
               }`}
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 rounded-2xl bg-cyan-500/20 text-cyan-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-cyan-500/20 text-cyan-300">
                   <Activity className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">💪 Salud Física</h3>
-                  <p className="text-xs text-cyan-300/80">Vitalidad, energía y fuerza corporal</p>
+                  <h3 className="text-sm font-bold text-white">💪 Salud Física</h3>
+                  <p className="text-xs text-cyan-300/80">Vitalidad, energía y resistencia corporal</p>
                 </div>
               </div>
-              <p className="text-xs text-white/70 leading-relaxed mt-2">
-                Evaluación de energía física, calidad de descanso, alimentación y movimiento diario.
-              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 3: TU META EN TUS PALABRAS */}
-      {step === 3 && (
-        <div className="flex-1 flex flex-col justify-center gap-6 my-auto">
+      {/* PHASE 3: TU META EN TUS PALABRAS */}
+      {phase === 3 && (
+        <div className="flex-1 flex flex-col justify-center gap-6 my-auto z-10">
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
               Escribe tu meta en tus palabras
             </h1>
             <p className="text-xs text-white/60">
-              Mientras más honesta tu meta, más precisa será tu proyección de futuro.
+              Mientras más honesta tu meta, más precisa será tu proyección de futuro con la IA.
             </p>
           </div>
 
@@ -313,289 +555,66 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* STEP 4: EVALUACIÓN CLÍNICA DE LIC. MARÍA DEL PILAR CRÍA */}
-      {step === 4 && (
-        <div className="flex-1 flex flex-col justify-start gap-4 my-2">
-          <div className="text-center">
-            <h1 className="text-lg font-bold text-white">
-              {category === "salud_mental" ? "🧠 Evaluación de Salud Emocional" : "💪 Evaluación de Salud Física"}
-            </h1>
-            <p className="text-[11px] text-white/60">Responde con honestidad para calcular tu aura inicial.</p>
+      {/* PHASE 4: PREGUNTAS STEP-BY-STEP (1 PREGUNTA POR PANTALLA, FRICCIÓN CERO) */}
+      {phase === 4 && currentQuestion && (
+        <div className="flex-1 flex flex-col justify-center gap-6 my-auto z-10 animate-in fade-in duration-300">
+          <div className="text-center space-y-2">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-cyan-400 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-500/30 inline-block">
+              {category === "salud_mental" ? "🧠 Salud Emocional" : "💪 Salud Física"}
+            </span>
+            <h2 className="text-lg font-bold text-white leading-snug px-2">
+              {currentQuestion.title}
+            </h2>
           </div>
 
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            {category === "salud_mental" ? (
-              <>
-                {/* Q1 */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    1. ¿Cómo ha sido tu estado de ánimo esta semana?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Muy positivo", pts: 20 },
-                      { label: "Estable", pts: 15 },
-                      { label: "Variable", pts: 5 },
-                      { label: "Bajo", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setMood(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          mood === opt.pts ? "glass-card-active text-amber-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+          {/* Options Grid */}
+          <div className="space-y-2.5">
+            {currentQuestion.options.map((opt) => {
+              const isSelected = answers[currentQuestion.id] === opt.pts;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => handleSelectOption(opt.pts)}
+                  className={`w-full py-4 px-5 rounded-2xl border text-left text-sm font-medium transition-all flex items-center justify-between group ${
+                    isSelected
+                      ? "glass-card-active border-purple-400 text-white shadow-lg shadow-purple-500/20"
+                      : "glass-card text-white/80 hover:text-white hover:border-white/30"
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <div
+                    className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
+                      isSelected
+                        ? "bg-purple-500 border-purple-400 text-white"
+                        : "border-white/20 group-hover:border-white/50"
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
-                </div>
+                </button>
+              );
+            })}
+          </div>
 
-                {/* Q2 */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    2. ¿Con qué frecuencia sientes estrés o ansiedad?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Casi nunca", pts: 20 },
-                      { label: "A veces", pts: 15 },
-                      { label: "Frecuente", pts: 5 },
-                      { label: "Casi siempre", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setAnxietyFreq(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          anxietyFreq === opt.pts ? "glass-card-active text-cyan-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q3 */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    3. ¿Qué tan conectado/a te sientes con las personas cercanas?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Muy conectado", pts: 20 },
-                      { label: "Conectado", pts: 15 },
-                      { label: "Algo distante", pts: 5 },
-                      { label: "Aislado", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setConnection(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          connection === opt.pts ? "glass-card-active text-purple-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q4 */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    4. ¿Tienes energía mental para tus tareas diarias?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Mucha", pts: 20 },
-                      { label: "Suficiente", pts: 15 },
-                      { label: "Poca", pts: 5 },
-                      { label: "Casi nada", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setMentalEnergy(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          mentalEnergy === opt.pts ? "glass-card-active text-amber-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q5 */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    5. ¿Qué tan satisfecho/a estás con tu vida ahora mismo?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Muy satisfecho", pts: 20 },
-                      { label: "Satisfecho", pts: 15 },
-                      { label: "Poco", pts: 5 },
-                      { label: "Insatisfecho", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setLifeSatisfaction(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          lifeSatisfaction === opt.pts ? "glass-card-active text-cyan-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Q1 Física */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    1. ¿Cómo calificarías tu nivel de energía física?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Alta", pts: 20 },
-                      { label: "Buena", pts: 15 },
-                      { label: "Baja", pts: 5 },
-                      { label: "Muy baja", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setPhysEnergy(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          physEnergy === opt.pts ? "glass-card-active text-cyan-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q2 Física */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    2. ¿Cómo describirías tu sueño últimamente?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Excelente", pts: 20 },
-                      { label: "Bien", pts: 15 },
-                      { label: "Regular", pts: 5 },
-                      { label: "Mal", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setSleepQuality(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          sleepQuality === opt.pts ? "glass-card-active text-purple-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q3 Física */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    3. ¿Con qué frecuencia haces algo de actividad física?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Casi a diario", pts: 20 },
-                      { label: "Varias veces/sem", pts: 15 },
-                      { label: "Poca", pts: 5 },
-                      { label: "Nada", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setExerciseFreq(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          exerciseFreq === opt.pts ? "glass-card-active text-amber-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q4 Física */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    4. ¿Cómo es tu alimentación en general?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Muy equilibrada", pts: 20 },
-                      { label: "Bastante bien", pts: 15 },
-                      { label: "Irregular", pts: 5 },
-                      { label: "Descuidada", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setDietQuality(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          dietQuality === opt.pts ? "glass-card-active text-cyan-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Q5 Física */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white font-medium block">
-                    5. ¿Sientes dolores o molestias físicas frecuentes?
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: "Casi nunca", pts: 20 },
-                      { label: "A veces", pts: 15 },
-                      { label: "Seguido", pts: 5 },
-                      { label: "Casi siempre", pts: 0 },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setPainFreq(opt.pts)}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all text-left ${
-                          painFreq === opt.pts ? "glass-card-active text-purple-300" : "glass-card text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+          {/* Navigation controls within step-by-step questions */}
+          <div className="flex items-center justify-between text-xs text-white/40 pt-2">
+            <button
+              type="button"
+              onClick={() => setQuestionIndex((prev) => Math.max(0, prev - 1))}
+              disabled={questionIndex === 0}
+              className="disabled:opacity-20 hover:text-white transition-colors"
+            >
+              ← Pregunta anterior
+            </button>
+            <span>Selecciona una opción para avanzar</span>
           </div>
         </div>
       )}
 
-      {/* STEP 5: REVEAL DE AURA CALCULADA (CALCULAR MI AURA) */}
-      {step === 5 && (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto">
+      {/* PHASE 5: REVEAL DE AURA CALCULADA (MATERIALIZACIÓN) */}
+      {phase === 5 && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto z-10">
           {isGenerating ? (
             <div className="flex flex-col items-center gap-6">
               <div className="relative">
@@ -603,8 +622,8 @@ export default function OnboardingPage() {
                 <Sparkles className="w-8 h-8 text-amber-300 absolute inset-0 m-auto animate-pulse" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white mb-1">Calculando tu Aura...</h2>
-                <p className="text-xs text-white/50">Procesando evaluación clínica neuropsicológica.</p>
+                <h2 className="text-xl font-bold text-white mb-1">Materializando tu Aura...</h2>
+                <p className="text-xs text-white/50">Procesando evaluación clínica y narrativa IA.</p>
               </div>
             </div>
           ) : (
@@ -635,15 +654,15 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* Bottom Action Button (Steps 1-4) */}
-      {step < 5 && (
+      {/* Bottom Action Button (Phases 1-3) */}
+      {phase < 4 && (
         <button
           type="button"
-          onClick={handleNext}
-          disabled={(step === 1 && !name.trim()) || (step === 3 && !goal.trim())}
-          className="w-full py-3.5 rounded-full glow-button text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-3"
+          onClick={() => setPhase((prev) => prev + 1)}
+          disabled={(phase === 1 && !name.trim()) || (phase === 3 && !goal.trim())}
+          className="w-full py-3.5 rounded-full glow-button text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-3 z-10"
         >
-          <span>{step === 4 ? "Calcular mi aura ✨" : "Continuar"}</span>
+          <span>Continuar</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       )}
