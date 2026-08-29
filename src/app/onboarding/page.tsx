@@ -174,8 +174,10 @@ export default function OnboardingPage() {
 
   // Photo State
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Category & Goal
   const [category, setCategory] = useState<"salud_mental" | "salud_fisica">("salud_mental");
@@ -196,7 +198,52 @@ export default function OnboardingPage() {
 
   const currentQuestion = activeQuestions[questionIndex];
 
-  // Canvas image compression for fast Data URL storage
+  // Camera Stream Controls (getUserMedia)
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setIsCameraActive(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera access error:", err);
+      fileInputRef.current?.click();
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const captureCameraPhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = 360;
+    canvas.height = 360;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    setPhotoUrl(dataUrl);
+    stopCamera();
+  };
+
+  // Canvas image compression for gallery file upload
   const handlePhotoFile = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -236,13 +283,11 @@ export default function OnboardingPage() {
     const updatedAnswers = { ...answers, [currentQuestion.id]: pts };
     setAnswers(updatedAnswers);
 
-    // Auto-advance to next question smoothly
     if (questionIndex < activeQuestions.length - 1) {
       setTimeout(() => {
         setQuestionIndex((prev) => prev + 1);
       }, 200);
     } else {
-      // Finished all 7 questions -> Calculate Aura Score & Go to Reveal Phase 6
       let totalPts = 0;
       Object.values(updatedAnswers).forEach((val) => {
         totalPts += val;
@@ -269,7 +314,6 @@ export default function OnboardingPage() {
         createdAt: Date.now(),
       };
 
-      // Call Gemini API in background during reveal
       fetch("/api/generate-futures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -467,7 +511,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 2: CAPTURA TU FOTO DE AURA */}
+      {/* PHASE 2: CAPTURA TU FOTO DE AURA CON CÁMARA O GALERÍA */}
       {phase === 2 && (
         <div className="flex-1 flex flex-col justify-center items-center gap-4 my-auto z-10 text-center animate-in fade-in duration-300">
           <div>
@@ -475,16 +519,31 @@ export default function OnboardingPage() {
               ✦ Tu Foto de Aura ✦
             </h1>
             <p className="text-xs text-white/60 max-w-xs mx-auto">
-              Tómate una foto o sube una imagen para iluminar tu esfera de aura.
+              {isCameraActive
+                ? "Encuadra tu rostro en el círculo y presiona capturar."
+                : "Tómate una foto o sube una imagen para iluminar tu esfera de aura."}
             </p>
           </div>
 
-          {/* Realtime Interactive Aura Orb Preview with Photo inside */}
-          <div className="my-1 scale-105">
-            <AuraOrb auraLevel={75} streak={1} photoUrl={photoUrl} size="lg" showDetails={false} />
+          {/* Realtime Interactive Aura Orb Preview or Live Video Stream */}
+          <div className="my-1 scale-105 relative">
+            {isCameraActive ? (
+              <div className="w-60 h-60 rounded-full border-4 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.6)] relative overflow-hidden bg-black flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                <div className="absolute inset-0 border-2 border-white/20 rounded-full pointer-events-none" />
+              </div>
+            ) : (
+              <AuraOrb auraLevel={75} streak={1} photoUrl={photoUrl} size="lg" showDetails={false} />
+            )}
           </div>
 
-          {/* Hidden inputs */}
+          {/* Hidden file input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -492,34 +551,49 @@ export default function OnboardingPage() {
             className="hidden"
             onChange={(e) => handlePhotoFile(e.target.files?.[0])}
           />
-          <input
-            type="file"
-            ref={cameraInputRef}
-            accept="image/*"
-            capture="user"
-            className="hidden"
-            onChange={(e) => handlePhotoFile(e.target.files?.[0])}
-          />
 
           {/* Action Buttons */}
           <div className="w-full max-w-xs space-y-2.5 mt-1">
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-cyan-500 to-amber-500 text-white font-bold text-xs tracking-wide shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <Camera className="w-4 h-4" />
-              <span>Tomar Foto con Cámara 📸</span>
-            </button>
+            {isCameraActive ? (
+              <>
+                <button
+                  type="button"
+                  onClick={captureCameraPhoto}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-purple-600 to-amber-500 text-white font-bold text-xs tracking-wide shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-amber-300" />
+                  <span>📸 Capturar Foto</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 px-4 rounded-2xl glass-card text-xs font-semibold text-white/80 hover:text-white border-white/20 flex items-center justify-center gap-2 hover:border-white/40 transition-all cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{photoUrl ? "Cambiar Foto de la Galería" : "Subir Foto de Galería"}</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="w-full py-2.5 text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancelar Cámara
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-cyan-500 to-amber-500 text-white font-bold text-xs tracking-wide shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Tomar Foto con Cámara 📸</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-3 px-4 rounded-2xl glass-card text-xs font-semibold text-white/80 hover:text-white border-white/20 flex items-center justify-center gap-2 hover:border-white/40 transition-all cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{photoUrl ? "Cambiar Foto de Galería" : "Subir Foto de Galería"}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -651,7 +725,7 @@ export default function OnboardingPage() {
               type="button"
               onClick={() => setQuestionIndex((prev) => Math.max(0, prev - 1))}
               disabled={questionIndex === 0}
-              className="disabled:opacity-20 hover:text-white transition-colors"
+              className="disabled:opacity-20 hover:text-white transition-colors cursor-pointer"
             >
               ← Pregunta anterior
             </button>
