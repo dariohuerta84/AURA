@@ -8,10 +8,52 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { getStoredUser } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 
+function ClerkSignInWidget() {
+  try {
+    const { isLoaded, isSignedIn } = useUser();
+    const { openSignIn } = useClerk();
+
+    if (isLoaded && isSignedIn) {
+      return (
+        <Link
+          href="/home"
+          className="w-full py-3 rounded-full glass-card text-xs font-medium text-cyan-300 border-cyan-500/30 flex items-center justify-center gap-1.5"
+        >
+          <span>Sesión Activa con Google ✓</span>
+        </Link>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          openSignIn({
+            fallbackRedirectUrl: "/home",
+            signUpFallbackRedirectUrl: "/onboarding",
+          })
+        }
+        className="w-full py-3 rounded-full glass-card text-xs font-medium text-white/70 hover:text-white border-white/10 hover:border-white/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+      >
+        <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+        <span>Ya tengo una cuenta / Sincronizar con Google</span>
+      </button>
+    );
+  } catch {
+    return (
+      <Link
+        href="/onboarding"
+        className="w-full py-3 rounded-full glass-card text-xs font-medium text-white/70 hover:text-white border-white/10 flex items-center justify-center gap-1.5"
+      >
+        <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+        <span>Sincronización PWA Activa</span>
+      </Link>
+    );
+  }
+}
+
 export default function SplashLandingPage() {
   const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
-  const { openSignIn } = useClerk();
   const [hasExistingLocalProfile, setHasExistingLocalProfile] = useState(false);
 
   useEffect(() => {
@@ -20,17 +62,6 @@ export default function SplashLandingPage() {
       setHasExistingLocalProfile(true);
     }
   }, []);
-
-  const handleOpenSignIn = () => {
-    try {
-      openSignIn({
-        fallbackRedirectUrl: "/home",
-        signUpFallbackRedirectUrl: "/onboarding",
-      });
-    } catch (e) {
-      console.error("Clerk openSignIn error", e);
-    }
-  };
 
   return (
     <div className="flex-1 flex flex-col items-center justify-between p-6 min-h-screen relative text-center overflow-hidden">
@@ -79,24 +110,8 @@ export default function SplashLandingPage() {
           </Link>
         )}
 
-        {/* Clerk Account Recovery / Login */}
-        {isLoaded && isSignedIn ? (
-          <Link
-            href="/home"
-            className="w-full py-3 rounded-full glass-card text-xs font-medium text-cyan-300 border-cyan-500/30 flex items-center justify-center gap-1.5"
-          >
-            <span>Sesión Activa con Google ✓</span>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={handleOpenSignIn}
-            className="w-full py-3 rounded-full glass-card text-xs font-medium text-white/70 hover:text-white border-white/10 hover:border-white/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Ya tengo una cuenta / Sincronizar con Google</span>
-          </button>
-        )}
+        {/* Safe Clerk Account Recovery Widget */}
+        <ClerkSignInWidget />
 
         <p className="text-[10px] text-white/40 pt-1">
           Hackathon Project • Next.js + Convex + Gemini AI + Clerk

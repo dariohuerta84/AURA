@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export default function middleware(req: NextRequest, event: any) {
+export function middleware(req: NextRequest) {
   const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  
   if (!pubKey || pubKey.trim() === "") {
     return NextResponse.next();
   }
-  
+
   try {
-    return clerkMiddleware()(req, event);
-  } catch {
+    const { clerkMiddleware } = require("@clerk/nextjs/server");
+    return clerkMiddleware({
+      publishableKey: pubKey,
+      secretKey: process.env.CLERK_SECRET_KEY,
+    })(req, {} as any);
+  } catch (e) {
     return NextResponse.next();
   }
 }
