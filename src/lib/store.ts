@@ -19,6 +19,7 @@ export interface UserProfile {
   auraLevel: number;
   currentStreak: number;
   longestStreak: number;
+  photoUrl?: string;
   currentAuraImageUrl?: string;
   createdAt: number;
 }

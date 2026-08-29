@@ -6,6 +6,7 @@ import { Sparkles, Flame, Zap } from "lucide-react";
 interface AuraOrbProps {
   auraLevel: number; // 0-100
   streak: number;
+  photoUrl?: string;
   size?: "sm" | "md" | "lg";
   showDetails?: boolean;
 }
@@ -13,6 +14,7 @@ interface AuraOrbProps {
 export const AuraOrb: React.FC<AuraOrbProps> = ({
   auraLevel,
   streak,
+  photoUrl,
   size = "md",
   showDetails = true,
 }) => {
@@ -49,14 +51,26 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
 
         {/* Central Core Glowing Orb */}
         <div
-          className={`aura-orb-element ${orbDimensions} rounded-full bg-gradient-to-br ${tier.gradient} flex flex-col items-center justify-center border border-white/20 shadow-2xl transition-transform duration-500`}
+          className={`aura-orb-element ${orbDimensions} rounded-full bg-gradient-to-br ${tier.gradient} flex flex-col items-center justify-center border border-white/30 shadow-2xl transition-transform duration-500 relative overflow-hidden`}
         >
-          <div className="absolute inset-2 rounded-full bg-black/20 backdrop-blur-xs flex flex-col items-center justify-center text-center p-2">
-            <Sparkles className={`w-5 h-5 mb-1 ${tier.textCol} animate-pulse`} />
-            <span className="font-mono text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.5)]">
+          {/* Illuminated User Photo Layer inside Orb */}
+          {photoUrl && (
+            <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
+              <img
+                src={photoUrl}
+                alt="Foto de Aura"
+                className="w-full h-full object-cover opacity-40 mix-blend-overlay scale-110 filter brightness-110 contrast-125 transition-all duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20" />
+            </div>
+          )}
+
+          <div className="absolute inset-2 rounded-full bg-black/35 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-2 z-10">
+            <Sparkles className={`w-5 h-5 mb-1 ${tier.textCol} animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]`} />
+            <span className="font-mono text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
               {auraLevel}
             </span>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-white/70">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-white/90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.9)]">
               AURA
             </span>
           </div>

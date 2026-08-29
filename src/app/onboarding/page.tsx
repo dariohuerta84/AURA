@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Check } from "lucide-react";
+import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Check, Camera, Upload } from "lucide-react";
 import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
@@ -99,104 +99,31 @@ const PHYSICAL_QUESTIONS: Question[] = [
   },
   {
     id: "sleep",
-    title: "2. ¿Cómo describirías la calidad de tu descanso nocturno?",
+    title: "2. ¿Cómo es la calidad de tu descanso al despertar?",
     options: [
-      { label: "Excelente y reparador", pts: 20 },
-      { label: "Bien", pts: 15 },
-      { label: "Regular / Entrecortado", pts: 5 },
-      { label: "Mal / Insomnio", pts: 0 },
+      { label: "Reparador e insuperable", pts: 20 },
+      { label: "Aceptable", pts: 15 },
+      { label: "Ligeramente fatigado/a", pts: 5 },
+      { label: "Exhausto/a", pts: 0 },
     ],
   },
   {
-    id: "exercise",
-    title: "3. ¿Con qué frecuencia haces actividad física o ejercicio?",
+    id: "movement",
+    title: "3. ¿Con qué frecuencia realizas actividad física o ejercicio?",
     options: [
-      { label: "Casi a diario", pts: 20 },
-      { label: "3-4 veces por semana", pts: 15 },
-      { label: "Ocasional", pts: 5 },
-      { label: "Casi nada / Sedentario", pts: 0 },
-    ],
-  },
-  {
-    id: "diet",
-    title: "4. ¿Cómo percibes tu alimentación general?",
-    options: [
-      { label: "Muy equilibrada", pts: 20 },
-      { label: "Bastante bien", pts: 15 },
-      { label: "Irregular", pts: 5 },
-      { label: "Descuidada", pts: 0 },
-    ],
-  },
-  {
-    id: "pain",
-    title: "5. ¿Sientes dolores de cabeza o molestias corporales?",
-    options: [
-      { label: "Casi nunca", pts: 20 },
-      { label: "A veces", pts: 15 },
-      { label: "Frecuentes", pts: 5 },
-      { label: "Casi siempre", pts: 0 },
-    ],
-  },
-  {
-    id: "hydration",
-    title: "6. ¿Mantienes buena hidratación y cuidado corporal diario?",
-    options: [
-      { label: "Excelente", pts: 20 },
-      { label: "Adecuada", pts: 15 },
-      { label: "Regular", pts: 5 },
-      { label: "Muy deficiente", pts: 0 },
-    ],
-  },
-  {
-    id: "stamina",
-    title: "7. ¿Cómo llegas al final de tu día físicamente?",
-    options: [
-      { label: "Con energía", pts: 20 },
-      { label: "Cansancio normal", pts: 15 },
-      { label: "Bastante agotado", pts: 5 },
-      { label: "Extenuado / Sin fuerzas", pts: 0 },
-    ],
-  },
-];
-
-const PRODUCTIVITY_QUESTIONS: Question[] = [
-  {
-    id: "focus",
-    title: "1. ¿Qué tan fácil mantienes el enfoque sin distraerte?",
-    options: [
-      { label: "Muy fácil", pts: 20 },
-      { label: "Bien", pts: 15 },
-      { label: "Me distraigo a menudo", pts: 5 },
-      { label: "Casi imposible", pts: 0 },
-    ],
-  },
-  {
-    id: "planning",
-    title: "2. ¿Planificas tus prioridades antes de empezar el día?",
-    options: [
-      { label: "Siempre", pts: 20 },
-      { label: "La mayoría de veces", pts: 15 },
+      { label: "4 o más veces por semana", pts: 20 },
+      { label: "2 a 3 veces por semana", pts: 15 },
       { label: "Rara vez", pts: 5 },
-      { label: "Nunca", pts: 0 },
+      { label: "Casi nunca / Sedentario", pts: 0 },
     ],
   },
   {
-    id: "procrastination",
-    title: "3. ¿Sueles postergar tareas clave por indecisión?",
+    id: "nutrition",
+    title: "4. ¿Sientes que alimentas tu cuerpo con nutrientes de calidad?",
     options: [
-      { label: "Casi nunca", pts: 20 },
-      { label: "A veces", pts: 15 },
-      { label: "Frecuentemente", pts: 5 },
-      { label: "Siempre", pts: 0 },
-    ],
-  },
-  {
-    id: "completion",
-    title: "4. ¿Logras completar tus metas propuestas del día?",
-    options: [
-      { label: "Casi todo", pts: 20 },
-      { label: "La mayoría", pts: 15 },
-      { label: "La mitad", pts: 5 },
+      { label: "Siempre conscientemente", pts: 20 },
+      { label: "La mayor parte del tiempo", pts: 15 },
+      { label: "A veces", pts: 5 },
       { label: "Muy poco", pts: 0 },
     ],
   },
@@ -235,8 +162,8 @@ const PRODUCTIVITY_QUESTIONS: Question[] = [
 export default function OnboardingPage() {
   const router = useRouter();
 
-  // Onboarding Overall Phase
-  // 1: Perfil General, 2: Selección Categoría, 3: Meta en tus palabras, 4: Preguntas Step-by-Step, 5: Reveal
+  // Onboarding Overall Phase:
+  // 1: Perfil General, 2: Foto de Aura, 3: Categoría, 4: Meta, 5: Preguntas Step-by-Step, 6: Reveal
   const [phase, setPhase] = useState<number>(1);
 
   // Form State: General
@@ -244,6 +171,11 @@ export default function OnboardingPage() {
   const [ageRange, setAgeRange] = useState<"18-24" | "25-30" | "31+">("25-30");
   const [gender, setGender] = useState<"male" | "female" | "prefer_not_to_say">("female");
   const [weight, setWeight] = useState<number>(65);
+
+  // Photo State
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Category & Goal
   const [category, setCategory] = useState<"salud_mental" | "salud_fisica">("salud_mental");
@@ -253,7 +185,7 @@ export default function OnboardingPage() {
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
 
-  // Animation State for Step 5 (Reveal)
+  // Animation State for Reveal Phase
   const [isGenerating, setIsGenerating] = useState(false);
   const [calculatedAura, setCalculatedAura] = useState(50);
   const [aiHabits, setAiHabits] = useState<Habit[]>([]);
@@ -263,6 +195,42 @@ export default function OnboardingPage() {
     category === "salud_mental" ? EMOTIONAL_QUESTIONS : PHYSICAL_QUESTIONS;
 
   const currentQuestion = activeQuestions[questionIndex];
+
+  // Canvas image compression for fast Data URL storage
+  const handlePhotoFile = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const rawUrl = e.target?.result as string;
+      if (!rawUrl) return;
+
+      const img = new Image();
+      img.src = rawUrl;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 360;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        setPhotoUrl(canvas.toDataURL("image/jpeg", 0.85));
+      };
+    };
+  };
 
   const handleSelectOption = (pts: number) => {
     const updatedAnswers = { ...answers, [currentQuestion.id]: pts };
@@ -274,7 +242,7 @@ export default function OnboardingPage() {
         setQuestionIndex((prev) => prev + 1);
       }, 200);
     } else {
-      // Finished all 7 questions -> Calculate Aura Score & Go to Reveal Phase 5
+      // Finished all 7 questions -> Calculate Aura Score & Go to Reveal Phase 6
       let totalPts = 0;
       Object.values(updatedAnswers).forEach((val) => {
         totalPts += val;
@@ -284,7 +252,7 @@ export default function OnboardingPage() {
       const score = Math.min(100, Math.max(15, Math.round((totalPts / maxPossiblePts) * 100)));
       setCalculatedAura(score);
 
-      setPhase(5);
+      setPhase(6);
       setIsGenerating(true);
 
       const tempUser: UserProfile = {
@@ -294,13 +262,14 @@ export default function OnboardingPage() {
         weight,
         category,
         goal,
+        photoUrl,
         auraLevel: score,
         currentStreak: 1,
         longestStreak: 1,
         createdAt: Date.now(),
       };
 
-      // Call Gemini API in background during reveal — generates futures AND personalized habits
+      // Call Gemini API in background during reveal
       fetch("/api/generate-futures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -316,7 +285,6 @@ export default function OnboardingPage() {
               createdAt: Date.now(),
             });
           }
-          // Save AI-generated personalized habits
           if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
             const generatedHabits: Habit[] = data.habits.map((h: any, i: number) => ({
               id: `ai_${Date.now()}_${i}`,
@@ -356,6 +324,7 @@ export default function OnboardingPage() {
       weight,
       category,
       goal,
+      photoUrl,
       auraLevel: calculatedAura,
       currentStreak: 1,
       longestStreak: 1,
@@ -363,7 +332,6 @@ export default function OnboardingPage() {
     };
 
     saveStoredUser(userProfile);
-    // Use AI-generated habits if available, otherwise fall back to defaults
     const habitsToSave = aiHabits.length > 0 ? aiHabits : getStoredHabits(category);
     saveStoredHabits(habitsToSave);
 
@@ -373,16 +341,23 @@ export default function OnboardingPage() {
   return (
     <div className="flex-1 flex flex-col justify-between p-5 min-h-screen relative overflow-y-auto">
       {/* Top Header Progress Bar */}
-      {phase < 5 && (
+      {phase < 6 && (
         <div className="w-full mb-4 z-10">
           <div className="flex items-center justify-between text-xs text-white/50 mb-2">
-            <span className="uppercase tracking-widest font-semibold text-purple-400">
-              EVALUACIÓN CLÍNICA ADAPTATIVA
-            </span>
+            <div className="flex items-center gap-2">
+              <img
+                src="/logo-azul.png"
+                alt="Aura Logo"
+                className="w-6 h-6 object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]"
+              />
+              <span className="uppercase tracking-widest font-semibold text-purple-400">
+                EVALUACIÓN CLÍNICA ADAPTATIVA
+              </span>
+            </div>
             <span>
-              {phase === 4
+              {phase === 5
                 ? `Pregunta ${questionIndex + 1} de ${activeQuestions.length}`
-                : `Paso ${phase} de 4`}
+                : `Paso ${phase} de 5`}
             </span>
           </div>
           <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
@@ -390,9 +365,9 @@ export default function OnboardingPage() {
               className="bg-gradient-to-r from-purple-500 via-cyan-400 to-amber-400 h-full transition-all duration-500"
               style={{
                 width:
-                  phase === 4
+                  phase === 5
                     ? `${((questionIndex + 1) / activeQuestions.length) * 100}%`
-                    : `${(phase / 4) * 100}%`,
+                    : `${(phase / 5) * 100}%`,
               }}
             />
           </div>
@@ -492,8 +467,65 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 2: SELECCIÓN DE CATEGORÍA */}
+      {/* PHASE 2: CAPTURA TU FOTO DE AURA */}
       {phase === 2 && (
+        <div className="flex-1 flex flex-col justify-center items-center gap-4 my-auto z-10 text-center animate-in fade-in duration-300">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white mb-1.5">
+              ✦ Tu Foto de Aura ✦
+            </h1>
+            <p className="text-xs text-white/60 max-w-xs mx-auto">
+              Tómate una foto o sube una imagen para iluminar tu esfera de aura.
+            </p>
+          </div>
+
+          {/* Realtime Interactive Aura Orb Preview with Photo inside */}
+          <div className="my-1 scale-105">
+            <AuraOrb auraLevel={75} streak={1} photoUrl={photoUrl} size="lg" showDetails={false} />
+          </div>
+
+          {/* Hidden inputs */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handlePhotoFile(e.target.files?.[0])}
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={(e) => handlePhotoFile(e.target.files?.[0])}
+          />
+
+          {/* Action Buttons */}
+          <div className="w-full max-w-xs space-y-2.5 mt-1">
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-cyan-500 to-amber-500 text-white font-bold text-xs tracking-wide shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Tomar Foto con Cámara 📸</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-3 px-4 rounded-2xl glass-card text-xs font-semibold text-white/80 hover:text-white border-white/20 flex items-center justify-center gap-2 hover:border-white/40 transition-all cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{photoUrl ? "Cambiar Foto de la Galería" : "Subir Foto de Galería"}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 3: SELECCIÓN DE CATEGORÍA */}
+      {phase === 3 && (
         <div className="flex-1 flex flex-col justify-center gap-5 my-auto z-10">
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
@@ -542,8 +574,8 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 3: TU META EN TUS PALABRAS */}
-      {phase === 3 && (
+      {/* PHASE 4: TU META EN TUS PALABRAS */}
+      {phase === 4 && (
         <div className="flex-1 flex flex-col justify-center gap-6 my-auto z-10">
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
@@ -571,8 +603,8 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 4: PREGUNTAS STEP-BY-STEP (1 PREGUNTA POR PANTALLA, FRICCIÓN CERO) */}
-      {phase === 4 && currentQuestion && (
+      {/* PHASE 5: PREGUNTAS STEP-BY-STEP (1 PREGUNTA POR PANTALLA) */}
+      {phase === 5 && currentQuestion && (
         <div className="flex-1 flex flex-col justify-center gap-6 my-auto z-10 animate-in fade-in duration-300">
           <div className="text-center space-y-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-cyan-400 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-500/30 inline-block">
@@ -602,8 +634,8 @@ export default function OnboardingPage() {
                   <div
                     className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
                       isSelected
-                        ? "bg-purple-500 border-purple-400 text-white"
-                        : "border-white/20 group-hover:border-white/50"
+                        ? "border-purple-400 bg-purple-500 text-white"
+                        : "border-white/20 group-hover:border-white/40"
                     }`}
                   >
                     {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -628,8 +660,8 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 5: REVEAL DE AURA CALCULADA (MATERIALIZACIÓN) */}
-      {phase === 5 && (
+      {/* PHASE 6: REVEAL DE AURA CALCULADA CON FOTO EN EL ORBE */}
+      {phase === 6 && (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto z-10">
           {isGenerating ? (
             <div className="flex flex-col items-center gap-6">
@@ -651,16 +683,17 @@ export default function OnboardingPage() {
                 <h1 className="text-2xl font-bold text-white">Bienvenido, {name}</h1>
               </div>
 
-              <AuraOrb auraLevel={calculatedAura} streak={1} size="lg" showDetails={true} />
+              {/* Glowing Aura Orb displaying the calculated Aura and User Photo */}
+              <AuraOrb auraLevel={calculatedAura} streak={1} photoUrl={photoUrl} size="lg" showDetails={true} />
 
-              <p className="text-xs text-white/70 max-w-xs leading-relaxed my-2">
+              <p className="text-xs text-white/70 max-w-xs leading-relaxed my-1">
                 Tu evaluación de {category === "salud_mental" ? "Salud Emocional" : "Salud Física"} determinó tu aura inicial en nivel <strong className="text-purple-300 font-bold">{calculatedAura} / 100</strong>. Cada hábito que cumplas elevará tu energía.
               </p>
 
               <button
                 type="button"
                 onClick={handleFinishOnboarding}
-                className="w-full py-4 rounded-full glow-button text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 mt-2"
+                className="w-full py-4 rounded-full glow-button text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 <span>Comenzar mi viaje</span>
                 <ArrowRight className="w-4 h-4" />
@@ -670,15 +703,15 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* Bottom Action Button (Phases 1-3) */}
-      {phase < 4 && (
+      {/* Bottom Action Button (Phases 1-4) */}
+      {phase < 5 && (
         <button
           type="button"
           onClick={() => setPhase((prev) => prev + 1)}
-          disabled={(phase === 1 && !name.trim()) || (phase === 3 && !goal.trim())}
-          className="w-full py-3.5 rounded-full glow-button text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-3 z-10"
+          disabled={(phase === 1 && !name.trim()) || (phase === 4 && !goal.trim())}
+          className="w-full py-3.5 rounded-full glow-button text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-3 z-10 cursor-pointer"
         >
-          <span>Continuar</span>
+          <span>{phase === 2 && !photoUrl ? "Omitir por ahora ✦" : "Continuar ✦"}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       )}

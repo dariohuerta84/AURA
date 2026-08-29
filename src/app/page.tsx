@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { getStoredUser } from "@/lib/store";
+import { getStoredUser, UserProfile } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 
 function ClerkSignInWidget() {
@@ -54,12 +54,12 @@ function ClerkSignInWidget() {
 
 export default function SplashLandingPage() {
   const router = useRouter();
-  const [hasExistingLocalProfile, setHasExistingLocalProfile] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const user = getStoredUser();
     if (user && user.name) {
-      setHasExistingLocalProfile(true);
+      setUserProfile(user);
     }
   }, []);
 
@@ -92,15 +92,21 @@ export default function SplashLandingPage() {
 
       {/* Central Breathtaking Glowing Aura Orb */}
       <div className="my-auto z-10 scale-110 animate-in zoom-in fade-in duration-1000">
-        <AuraOrb auraLevel={75} streak={1} size="lg" showDetails={false} />
+        <AuraOrb
+          auraLevel={userProfile?.auraLevel || 75}
+          streak={userProfile?.currentStreak || 1}
+          photoUrl={userProfile?.photoUrl}
+          size="lg"
+          showDetails={false}
+        />
         <div className="mt-2 text-xs font-semibold text-cyan-300 tracking-widest uppercase">
-          ✦ NIVEL AURA: BRILLANTE ✦
+          ✦ NIVEL AURA: {userProfile ? (userProfile.auraLevel >= 80 ? "RADIANTE" : "BRILLANTE") : "BRILLANTE"} ✦
         </div>
       </div>
 
       {/* Bottom CTA Action Buttons */}
       <div className="w-full space-y-3 pb-4 z-10">
-        {hasExistingLocalProfile ? (
+        {Boolean(userProfile) ? (
           <Link
             href="/home"
             className="w-full py-4 rounded-full glow-button text-white font-bold text-sm tracking-wide shadow-2xl flex items-center justify-center gap-2"

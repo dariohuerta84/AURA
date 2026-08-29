@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Flame, X, Sparkles, MessageCircle, ShieldCheck } from "lucide-react";
+import { Flame, X, Sparkles, MessageCircle, ShieldCheck, Send, ArrowLeft, Loader2 } from "lucide-react";
 import { getStoredUser, getCommunityCandidates, CommunityCandidate, UserProfile } from "@/lib/store";
 import { BottomNav } from "@/components/BottomNav";
 import confetti from "canvas-confetti";
@@ -20,86 +20,29 @@ export type MatchCandidate = {
   bio: string;
 };
 
-// Generador de Candidatos Reales por Categoría
-const COMMUNITY_CANDIDATES: MatchCandidate[] = [
-  {
-    id: 1,
-    nombre: "Camila R.",
-    categoria: "Salud Emocional",
-    categoryKey: "salud_mental",
-    habito: "10 min de meditación y soltar la ansiedad laboral",
-    racha: 6,
-    auraLevel: 82,
-    colorFrom: "#a78bfa",
-    colorTo: "#4c1d95",
-    bio: "Buscando reducir la rumiación mental al final del día.",
-  },
-  {
-    id: 2,
-    nombre: "Diego M.",
-    categoria: "Salud Emocional",
-    categoryKey: "salud_mental",
-    habito: "Dormir antes de las 11:00 PM sin pantallas",
-    racha: 4,
-    auraLevel: 74,
-    colorFrom: "#60a5fa",
-    colorTo: "#1e3a8a",
-    bio: "Enfocado en higiene de sueño y paz interior.",
-  },
-  {
-    id: 3,
-    nombre: "Valeria K.",
-    categoria: "Salud Física",
-    categoryKey: "salud_fisica",
-    habito: "Entrenar 4 veces por semana sin excusas",
-    racha: 12,
-    auraLevel: 91,
-    colorFrom: "#f0abfc",
-    colorTo: "#701a75",
-    bio: "Buscando constancia física y mayor fuerza muscular.",
-  },
-  {
-    id: 4,
-    nombre: "Mateo S.",
-    categoria: "Salud Física",
-    categoryKey: "salud_fisica",
-    habito: "Tomar 2.5 litros de agua y evitar azúcares",
-    racha: 5,
-    auraLevel: 68,
-    colorFrom: "#34d399",
-    colorTo: "#065f46",
-    bio: "Mejorando energía vital y hábitos de hidratación.",
-  },
-  {
-    id: 5,
-    nombre: "Sofía T.",
-    categoria: "Salud Emocional",
-    categoryKey: "salud_mental",
-    habito: "Escribir en diario de gratitud al despertar",
-    racha: 9,
-    auraLevel: 88,
-    colorFrom: "#f472b6",
-    colorTo: "#831843",
-    bio: "Reemplazando el scroll matutino por paz mental.",
-  },
-  {
-    id: 6,
-    nombre: "Lucas A.",
-    categoria: "Salud Física",
-    categoryKey: "salud_fisica",
-    habito: "Caminata de 30 min bajo la luz del sol",
-    racha: 7,
-    auraLevel: 79,
-    colorFrom: "#fbbf24",
-    colorTo: "#78350f",
-    bio: "Recuperando ritmo circadiano y vitalidad corporal.",
-  },
-];
+export interface ChatMessage {
+  id: string;
+  sender: "user" | "companion";
+  text: string;
+  timestamp: number;
+}
 
-function EsferaAura({ nombre, colorFrom, colorTo, size = 96 }: { nombre: string; colorFrom: string; colorTo: string; size?: number }) {
+function EsferaAura({
+  nombre,
+  colorFrom,
+  colorTo,
+  photoUrl,
+  size = 96,
+}: {
+  nombre: string;
+  colorFrom: string;
+  colorTo: string;
+  photoUrl?: string;
+  size?: number;
+}) {
   return (
     <div
-      className="rounded-full flex items-center justify-center font-extrabold text-white shrink-0 shadow-2xl transition-transform duration-500 hover:scale-105"
+      className="rounded-full flex items-center justify-center font-extrabold text-white shrink-0 shadow-2xl transition-transform duration-500 hover:scale-105 relative overflow-hidden"
       style={{
         width: size,
         height: size,
@@ -108,7 +51,18 @@ function EsferaAura({ nombre, colorFrom, colorTo, size = 96 }: { nombre: string;
         fontSize: size * 0.35,
       }}
     >
-      {nombre[0]}
+      {photoUrl ? (
+        <>
+          <img
+            src={photoUrl}
+            alt={nombre}
+            className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay scale-110"
+          />
+          <span className="relative z-10 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">{nombre[0]}</span>
+        </>
+      ) : (
+        nombre[0]
+      )}
     </div>
   );
 }
@@ -119,16 +73,19 @@ export default function HabitMatchPage() {
   const [candidates, setCandidates] = useState<CommunityCandidate[]>([]);
   const [index, setIndex] = useState<number>(0);
   const [matchedCandidate, setMatchedCandidate] = useState<CommunityCandidate | null>(null);
-  const [sentMessage, setSentMessage] = useState<string>("");
-  const [messageSentSuccess, setMessageSentSuccess] = useState(false);
+
+  // Chat State
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const user = getStoredUser();
     if (user && user.name) {
       setCurrentUser(user);
-      // Load real community candidates, prioritizing user's category
       const all = getCommunityCandidates();
-      // Filter out own profile
       const others = all.filter((c) => c.nombre !== user.name && c.id !== user.id);
       const sameCat = others.filter((c) => c.categoryKey === user.category);
       const diffCat = others.filter((c) => c.categoryKey !== user.category);
@@ -137,6 +94,37 @@ export default function HabitMatchPage() {
       router.replace("/onboarding");
     }
   }, [router]);
+
+  // Load persistent chat history when a candidate is matched
+  useEffect(() => {
+    if (matchedCandidate) {
+      const storageKey = `aura_chat_msg_${matchedCandidate.id}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          setChatMessages(JSON.parse(saved));
+        } catch {
+          setChatMessages([]);
+        }
+      } else {
+        // Initial greeting message from candidate
+        const initialMsg: ChatMessage = {
+          id: `msg_init_${Date.now()}`,
+          sender: "companion",
+          text: `¡Hola ${currentUser?.name || "compañero"}! 🌟 Me alegra hacer match. Yo estoy enfocado/a en "${matchedCandidate.habito}". ¿Cómo va tu día?`,
+          timestamp: Date.now(),
+        };
+        setChatMessages([initialMsg]);
+        localStorage.setItem(storageKey, JSON.stringify([initialMsg]));
+      }
+    }
+  }, [matchedCandidate, currentUser]);
+
+  useEffect(() => {
+    if (showChatModal) {
+      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, showChatModal, isTyping]);
 
   if (!currentUser || candidates.length === 0) {
     return (
@@ -173,17 +161,51 @@ export default function HabitMatchPage() {
 
   const cerrarMatch = () => {
     setMatchedCandidate(null);
-    setMessageSentSuccess(false);
-    setSentMessage("");
+    setShowChatModal(false);
+    setChatInput("");
     siguiente();
   };
 
-  const handleSendMessage = () => {
-    if (!sentMessage.trim()) return;
-    setMessageSentSuccess(true);
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || !matchedCandidate) return;
+
+    const userText = chatInput.trim();
+    setChatInput("");
+
+    const newMsg: ChatMessage = {
+      id: `msg_usr_${Date.now()}`,
+      sender: "user",
+      text: userText,
+      timestamp: Date.now(),
+    };
+
+    const updated = [...chatMessages, newMsg];
+    setChatMessages(updated);
+    localStorage.setItem(`aura_chat_msg_${matchedCandidate.id}`, JSON.stringify(updated));
+
+    setIsTyping(true);
+
+    // Simulate real-time companion reply
     setTimeout(() => {
-      cerrarMatch();
-    }, 1800);
+      const responses = [
+        `¡Muchas gracias por tu aliento, ${currentUser.name}! 💜 Mi meta de ${matchedCandidate.categoria.toLowerCase()} me tiene súper motivado/a. ¡Sigamos constantes hoy! 🔥`,
+        `¡Totalmente de acuerdo! Sostener el hábito de "${matchedCandidate.habito}" ha sido un cambio enorme para mí. ¡Tú también lograrás tu meta! ✨`,
+        `¡Gracias por la vibra positiva, ${currentUser.name}! Vamos a darle con todo hoy. ¡Tu aura se siente radiante! ⚡`,
+      ];
+      const randomReply = responses[Math.floor(Math.random() * responses.length)];
+
+      const companionReply: ChatMessage = {
+        id: `msg_cmp_${Date.now()}`,
+        sender: "companion",
+        text: randomReply,
+        timestamp: Date.now(),
+      };
+
+      const finalMsgs = [...updated, companionReply];
+      setChatMessages(finalMsgs);
+      localStorage.setItem(`aura_chat_msg_${matchedCandidate.id}`, JSON.stringify(finalMsgs));
+      setIsTyping(false);
+    }, 1200);
   };
 
   return (
@@ -276,7 +298,7 @@ export default function HabitMatchPage() {
             </button>
           </div>
         </div>
-      ) : (
+      ) : !showChatModal ? (
         /* MATCH REVEAL SCREEN */
         <div className="my-auto flex flex-col items-center justify-center text-center z-10 w-full animate-in zoom-in fade-in duration-500">
           <div className="relative mb-2">
@@ -293,11 +315,12 @@ export default function HabitMatchPage() {
           </h2>
 
           <div className="my-5 flex items-center justify-center gap-4">
-            {/* Current User initials orb */}
+            {/* Current User initials/photo orb */}
             <EsferaAura
               nombre={currentUser.name || "Tú"}
               colorFrom="#8b5cf6"
               colorTo="#3b82f6"
+              photoUrl={currentUser.photoUrl}
               size={76}
             />
             <img
@@ -318,38 +341,112 @@ export default function HabitMatchPage() {
             Tú y <strong className="text-pink-300">{matchedCandidate.nombre}</strong> están persiguiendo el mismo compromiso de transformación. ¡Ahora no lo enfrentas solo/a!
           </p>
 
-          {/* Interactive Message Send */}
-          {messageSentSuccess ? (
-            <div className="mt-5 p-3 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>¡Mensaje de aliento enviado a {matchedCandidate.nombre}! ✦</span>
-            </div>
-          ) : (
-            <div className="w-full max-w-xs mt-5 space-y-2.5">
-              <input
-                type="text"
-                placeholder={`Envía un mensaje a ${matchedCandidate.nombre}...`}
-                value={sentMessage}
-                onChange={(e) => setSentMessage(e.target.value)}
-                className="w-full px-4 py-3 glass-input text-xs text-white"
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!sentMessage.trim()}
-                className="w-full py-3 rounded-full bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-500 text-white font-bold text-xs tracking-wide shadow-lg disabled:opacity-40 flex items-center justify-center gap-1.5"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Enviar aliento y continuar</span>
-              </button>
-            </div>
-          )}
+          <div className="w-full max-w-xs mt-6 space-y-2.5">
+            <button
+              onClick={() => setShowChatModal(true)}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-purple-600 to-cyan-500 text-white font-bold text-xs tracking-wide shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 text-amber-200" />
+              <span>Abrir Chat con {matchedCandidate.nombre}</span>
+            </button>
 
-          <button
-            onClick={cerrarMatch}
-            className="mt-4 text-xs text-white/50 hover:text-white transition-colors underline"
-          >
-            Explorar más compañeros
-          </button>
+            <button
+              onClick={cerrarMatch}
+              className="w-full py-2.5 text-xs text-white/50 hover:text-white transition-colors"
+            >
+              Explorar más compañeros
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* INTERACTIVE LIVE CHAT OVERLAY */
+        <div className="my-auto flex flex-col justify-between z-10 w-full glass-card p-4 rounded-3xl border border-white/20 shadow-2xl min-h-[440px] max-h-[520px] animate-in slide-in-from-bottom duration-300">
+          {/* Chat Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <button
+              onClick={() => setShowChatModal(false)}
+              className="flex items-center gap-1 text-xs text-white/60 hover:text-white"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Volver</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <EsferaAura
+                nombre={matchedCandidate.nombre}
+                colorFrom={matchedCandidate.colorFrom}
+                colorTo={matchedCandidate.colorTo}
+                size={32}
+              />
+              <div className="text-left">
+                <h3 className="text-xs font-bold text-white leading-tight">{matchedCandidate.nombre}</h3>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  En línea
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={cerrarMatch}
+              className="p-1.5 rounded-full glass-card text-white/50 hover:text-white"
+              title="Cerrar conversación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Chat Messages List */}
+          <div className="flex-1 overflow-y-auto py-3 space-y-3 px-1">
+            {chatMessages.map((msg) => {
+              const isMe = msg.sender === "user";
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}
+                >
+                  <div
+                    className={`max-w-[80%] p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                      isMe
+                        ? "bg-gradient-to-r from-purple-600 to-cyan-500 text-white rounded-br-none shadow-md"
+                        : "glass-card text-white/90 border-white/20 rounded-bl-none shadow-md"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })}
+
+            {isTyping && (
+              <div className="flex justify-start animate-in fade-in">
+                <div className="glass-card px-3 py-2 rounded-2xl text-xs text-purple-300/80 flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                  <span>{matchedCandidate.nombre} está escribiendo...</span>
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Chat Input Footer */}
+          <div className="pt-2 border-t border-white/10 flex items-center gap-2">
+            <input
+              type="text"
+              placeholder={`Escribe a ${matchedCandidate.nombre}...`}
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendChatMessage()}
+              className="flex-1 px-4 py-2.5 glass-input text-xs text-white"
+            />
+            <button
+              onClick={handleSendChatMessage}
+              disabled={!chatInput.trim()}
+              className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-white disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
