@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Volume2, VolumeX, Sparkles, AlertTriangle, ArrowRight } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
+import { useTts } from "@/hooks/useTts";
 
 interface FutureSceneProps {
   darkFuture: string;
@@ -15,7 +16,8 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"dark" | "bright">("dark");
   const [displayedText, setDisplayedText] = useState("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const { speak, stop, isPlaying, isLoading } = useTts();
+  const isSpeaking = isPlaying || isLoading;
 
   const fullText = activeTab === "dark" ? darkFuture : brightFuture;
 
@@ -35,36 +37,14 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
     return () => clearInterval(interval);
   }, [fullText]);
 
-  // Voice Speech Synthesis (Web Speech API)
+  // Google Cloud TTS (with Web Speech fallback via useTts hook)
   const toggleSpeech = () => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      stop();
       return;
     }
-
-    window.speechSynthesis.cancel(); // clear previous
-    const utterance = new SpeechSynthesisUtterance(fullText);
-    utterance.lang = "es-ES";
-    utterance.rate = activeTab === "dark" ? 0.9 : 0.95;
-    utterance.pitch = activeTab === "dark" ? 0.85 : 1.05;
-
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
-    setIsSpeaking(true);
+    speak(fullText);
   };
-
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
 
   return (
     <div className="flex flex-col gap-5 w-full">
@@ -73,8 +53,7 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
         <button
           type="button"
           onClick={() => {
-            if (isSpeaking && typeof window !== "undefined") window.speechSynthesis.cancel();
-            setIsSpeaking(false);
+            stop();
             setActiveTab("dark");
           }}
           className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-1.5 ${
@@ -90,8 +69,7 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
         <button
           type="button"
           onClick={() => {
-            if (isSpeaking && typeof window !== "undefined") window.speechSynthesis.cancel();
-            setIsSpeaking(false);
+            stop();
             setActiveTab("bright");
           }}
           className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-1.5 ${
@@ -144,7 +122,7 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
             }`}
             title="Escuchar narración en voz"
           >
-            {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
         </div>
 
@@ -159,14 +137,13 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
         {/* Footer Action */}
         <div className="flex items-center justify-between pt-3 border-t border-white/10 z-10">
           <span className="text-[11px] text-white/40 tracking-wider">
-            VOZ: Web Speech Synthesis (Nativo)
+            VOZ: Google Cloud TTS Neural
           </span>
 
           <button
             type="button"
             onClick={() => {
-              if (isSpeaking && typeof window !== "undefined") window.speechSynthesis.cancel();
-              setIsSpeaking(false);
+              stop();
               setActiveTab((prev) => (prev === "dark" ? "bright" : "dark"));
             }}
             className="flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
