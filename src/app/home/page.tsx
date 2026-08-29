@@ -13,7 +13,53 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+
+  const handleReplaceHabit = async (id: string) => {
+    if (!user || replacingId) return;
+
+    const targetHabit = habits.find((h) => h.id === id);
+    if (!targetHabit) return;
+
+    setReplacingId(id);
+
+    try {
+      const existingTitles = habits.map((h) => h.title);
+      const res = await fetch("/api/replace-habit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user,
+          targetDifficulty: targetHabit.difficulty,
+          existingTitles,
+          oldHabitTitle: targetHabit.title,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) {
+          const newHabit: Habit = {
+            id: `ai_rep_${Date.now()}`,
+            title: data.title,
+            category: user.category,
+            isDefault: false,
+            difficulty: data.difficulty || targetHabit.difficulty,
+            auraPoints: data.auraPoints || targetHabit.auraPoints,
+            completedToday: false,
+          };
+
+          const updated = habits.map((h) => (h.id === id ? newHabit : h));
+          setHabits(updated);
+          saveStoredHabits(updated);
+        }
+      }
+    } catch (e) {
+      console.error("Error al reemplazar hábito", e);
+    } finally {
+      setReplacingId(null);
+    }
+  };
 
   useEffect(() => {
     const u = getStoredUser();
@@ -51,7 +97,6 @@ export default function HomePage() {
     } else {
       router.replace("/onboarding");
     }
-    setIsLoaded(true);
   }, [router]);
 
   const handleToggleHabit = (id: string) => {
@@ -172,7 +217,9 @@ export default function HomePage() {
               difficulty={habit.difficulty}
               auraPoints={habit.auraPoints}
               completed={!!habit.completedToday}
+              isReplacing={replacingId === habit.id}
               onToggle={handleToggleHabit}
+              onReplace={handleReplaceHabit}
             />
           ))}
         </div>

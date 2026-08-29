@@ -44,13 +44,13 @@ export async function generateTtsAudio(text: string): Promise<Buffer | null> {
     input: { text },
     voice: {
       languageCode: "es-US",
-      name: "es-US-Neural2-C", // Spanish neural voice (female, warm)
+      name: "es-US-Neural2-A", // Ultra-clear Spanish Neural voice
       ssmlGender: "FEMALE",
     },
     audioConfig: {
       audioEncoding: "MP3",
-      speakingRate: 0.95,
-      pitch: -1.0, // Slightly deeper, more "aura" feeling
+      speakingRate: 0.96,
+      pitch: 0.0,
     },
   });
 

@@ -69,12 +69,20 @@ export default function SplashLandingPage() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-gradient-to-r from-purple-600/30 via-cyan-500/20 to-amber-500/20 blur-3xl pointer-events-none" />
 
       {/* Top Header Logo */}
-      <div className="pt-6 z-10">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 text-[11px] font-semibold tracking-widest uppercase mb-3">
+      <div className="pt-4 z-10 flex flex-col items-center">
+        <div className="relative mb-3">
+          <div className="absolute inset-0 rounded-full bg-cyan-500/30 blur-2xl animate-pulse" />
+          <img
+            src="/logo-azul.png"
+            alt="Aura Logo"
+            className="w-20 h-20 object-contain relative z-10 drop-shadow-[0_0_25px_rgba(59,130,246,0.8)]"
+          />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-300 text-[11px] font-semibold tracking-widest uppercase mb-2">
           <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
           <span>Transformación Personal con IA</span>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_4px_20px_rgba(124,58,237,0.5)]">
+        <h1 className="text-3xl font-extrabold tracking-widest text-white drop-shadow-[0_4px_20px_rgba(124,58,237,0.5)]">
           ✦ A U R A ✦
         </h1>
         <p className="text-xs text-white/60 mt-1 font-light tracking-wide">

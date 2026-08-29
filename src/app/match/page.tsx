@@ -251,7 +251,7 @@ export default function HabitMatchPage() {
             </div>
           </div>
 
-          {/* Swipe Buttons (X & Heart) */}
+          {/* Swipe Buttons (X & Match Logo) */}
           <div className="flex items-center justify-center gap-8 mt-6">
             <button
               onClick={pasar}
@@ -264,19 +264,28 @@ export default function HabitMatchPage() {
 
             <button
               onClick={darLike}
-              className="w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-[0_0_30px_rgba(249,115,22,0.6)] hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-tr from-amber-500 via-orange-500 to-purple-600"
+              className="w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-[0_0_30px_rgba(59,130,246,0.7)] hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-tr from-cyan-600 via-blue-600 to-purple-600"
               aria-label="Conectar Match"
               title="Hacer Match"
             >
-              <Flame className="w-7 h-7 text-white fill-white" />
+              <img
+                src="/logo-azul.png"
+                alt="Match Aura"
+                className="w-9 h-9 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+              />
             </button>
           </div>
         </div>
       ) : (
         /* MATCH REVEAL SCREEN */
         <div className="my-auto flex flex-col items-center justify-center text-center z-10 w-full animate-in zoom-in fade-in duration-500">
-          <div className="p-3 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-300 mb-3 animate-bounce">
-            <Sparkles className="w-8 h-8 text-pink-400" />
+          <div className="relative mb-2">
+            <div className="absolute inset-0 rounded-full bg-orange-500/30 blur-2xl animate-pulse" />
+            <img
+              src="/logo-naranja.png"
+              alt="Match Logrado"
+              className="w-20 h-20 object-contain relative z-10 animate-bounce drop-shadow-[0_0_35px_rgba(249,115,22,0.9)]"
+            />
           </div>
 
           <h2 className="text-3xl font-extrabold text-white tracking-tight drop-shadow-[0_0_25px_rgba(249,115,22,0.8)]">
@@ -291,7 +300,11 @@ export default function HabitMatchPage() {
               colorTo="#3b82f6"
               size={76}
             />
-            <Flame className="w-6 h-6 text-orange-400 fill-orange-400 animate-pulse" />
+            <img
+              src="/logo-naranja.png"
+              alt="Aura Flame Match"
+              className="w-8 h-8 object-contain animate-pulse drop-shadow-[0_0_15px_rgba(249,115,22,0.9)]"
+            />
             {/* Candidate Orb */}
             <EsferaAura
               nombre={matchedCandidate.nombre}

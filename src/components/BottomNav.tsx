@@ -27,11 +27,15 @@ export const BottomNav: React.FC = () => {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex items-center justify-center p-3.5 rounded-full bg-gradient-to-tr from-pink-600 via-purple-600 to-cyan-400 text-white shadow-[0_0_25px_rgba(236,72,153,0.7)] transition-all duration-300 ${
-                  isActive ? "scale-110 ring-2 ring-white/80" : "hover:scale-105"
+                className={`relative flex items-center justify-center p-2.5 rounded-full bg-gradient-to-tr from-cyan-600 via-blue-600 to-purple-600 text-white shadow-[0_0_25px_rgba(59,130,246,0.7)] transition-all duration-300 ${
+                  isActive ? "scale-110 ring-2 ring-cyan-300/80" : "hover:scale-105"
                 }`}
               >
-                <Icon className="w-5 h-5 text-white fill-white" />
+                <img
+                  src="/logo-azul.png"
+                  alt="Aura Match"
+                  className="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]"
+                />
                 <span className="sr-only">{item.label}</span>
               </Link>
             );
