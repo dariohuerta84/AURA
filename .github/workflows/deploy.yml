@@ -6,16 +6,12 @@ on:
 
 env:
   PROJECT_ID: angelic-throne-502610-v3
-  PROJECT_NUMBER: "986642980997"
   REGION: us-central1
   SERVICE_NAME: aura
   REPO_NAME: aura-registry
-  RUNTIME_SERVICE_ACCOUNT: rumi-runtime@angelic-throne-502610-v3.iam.gserviceaccount.com
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   deploy:
@@ -25,23 +21,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (Service Account Key)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-awards-pool/providers/github-rumi-provider
-          service_account: github-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Create Artifact Registry repository
+      - name: Configure Docker
+        run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+
+      - name: Create Artifact Registry repository (idempotent)
         run: |
           gcloud artifacts repositories create "$REPO_NAME" \
             --repository-format=docker \
             --location="$REGION" \
             --project="$PROJECT_ID" || true
-
-      - name: Configure Docker
-        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
       - name: Build and push Docker image
         env:
@@ -65,7 +60,6 @@ jobs:
             --region "$REGION" \
             --platform managed \
             --project "$PROJECT_ID" \
-            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
             --allow-unauthenticated \
             --port 8080 \
             --memory 512Mi \
@@ -74,7 +68,7 @@ jobs:
             --max-instances 3 \
             --set-env-vars "NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }},NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }},CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}"
 
-      - name: Show deployment URL
+      - name: Print deployed URL
         run: |
           gcloud run services describe "$SERVICE_NAME" \
             --region "$REGION" \
