@@ -52,6 +52,7 @@ export interface CommunityCandidate {
   colorFrom: string;
   colorTo: string;
   bio: string;
+  photoUrl?: string;
   createdAt: number;
 }
 
@@ -186,6 +187,7 @@ export function saveCommunityCandidate(user: UserProfile, habitTitle: string): v
     colorFrom: randomColor.from,
     colorTo: randomColor.to,
     bio: user.goal,
+    photoUrl: user.photoUrl,
     createdAt: Date.now(),
   };
 
