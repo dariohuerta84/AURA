@@ -1,0 +1,19 @@
+{
+  "name": "personaje-avatar-3d",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Avatar 3D desde foto: backend Django + TripoSR, capa Convex y servicio GPU.",
+  "scripts": {
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "convex": "^1.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3"
+  }
+}

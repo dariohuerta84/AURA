@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------
+# Dependencias (se reinstalan con npm install / pip install)
+# ---------------------------------------------------------------
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# ---------------------------------------------------------------
+# Secretos y configuracion local
+# ---------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+# .env.example SI se sube: es la plantilla sin valores reales.
+!.env.example
+
+# Convex: .env.local guarda CONVEX_DEPLOYMENT y la deploy key.
+# .convex/ es cache local del CLI.
+.convex/
+convex/.env.local
+
+# ---------------------------------------------------------------
+# Artefactos generados
+# ---------------------------------------------------------------
+dist/
+build/
+media/
+backend/media/
+db.sqlite3
+
+# Servicio GPU: el repo de TripoSR se clona aparte (~1.4GB de pesos)
+# y la carpeta de salida son meshes generados.
+gpu_service/TripoSR/
+gpu_service/gpu_service_output/
+
+# ---------------------------------------------------------------
+# Sistema / editores
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
