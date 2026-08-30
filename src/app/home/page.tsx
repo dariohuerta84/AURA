@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sparkles, Flame, Plus, Brain, Activity, CheckCircle2, Loader2, Target, X, PlusCircle, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getStoredUser, getStoredHabits, saveStoredHabits, saveStoredUser, saveStoredFutures, UserProfile, Habit } from "@/lib/store";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { UserProfile, Habit, saveStoredFutures } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import { HabitCard } from "@/components/HabitCard";
 import { BottomNav } from "@/components/BottomNav";
@@ -27,66 +29,99 @@ function HabitSkeletonCard() {
 
 export default function HomePage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [habits, setHabits] = useState<Habit[]>([]);
+  
+  // Get userId from localStorage (set during onboarding)
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Convex queries
+  const convexUser = useQuery(api.users.getById, userId ? { userId: userId as any } : "skip");
+  const convexHabits = useQuery(api.habits.listByUser, userId ? { userId: userId as any } : "skip");
+  const todayCheckIns = useQuery(api.checkIns.getToday, userId ? { userId: userId as any, date: new Date().toISOString().split("T")[0] } : "skip");
+  
+  // Convex mutations
+  const toggleCheckIn = useMutation(api.checkIns.toggle);
+  const replaceUserHabits = useMutation(api.habits.replaceUserHabits);
+  const createHabit = useMutation(api.habits.create);
+  const updateAura = useMutation(api.users.updateAura);
+
+  // Local state for UI
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [isGeneratingAiHabits, setIsGeneratingAiHabits] = useState(false);
-
-  // Modal 1: Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [newGoalInput, setNewGoalInput] = useState("");
   const [isGeneratingGoalHabits, setIsGeneratingGoalHabits] = useState(false);
-
-  // Modal 2: Add Habit Modal State
   const [showAddHabitModal, setShowAddHabitModal] = useState(false);
   const [customHabitTitle, setCustomHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "normal" | "hard">("normal");
   const [isGeneratingSingleHabit, setIsGeneratingSingleHabit] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
 
-  // Dynamic Aura recalculation based on total habits and completion ratio
-  const calculateAuraLevel = (updatedHabits: Habit[], currentUser: UserProfile) => {
-    const totalPossiblePoints = updatedHabits.reduce(
-      (sum, h) => sum + (h.auraPoints || (h.difficulty === "easy" ? 5 : h.difficulty === "normal" ? 8 : 12)),
-      0
-    );
-    const earnedPointsToday = updatedHabits
-      .filter((h) => h.completedToday)
-      .reduce(
-        (sum, h) => sum + (h.auraPoints || (h.difficulty === "easy" ? 5 : h.difficulty === "normal" ? 8 : 12)),
-        0
-      );
+  // Load userId and photo from localStorage
+  useEffect(() => {
+    const storedId = localStorage.getItem("aura_user_id");
+    const storedPhoto = localStorage.getItem("aura_user_photo");
+    if (storedId) {
+      setUserId(storedId);
+    } else {
+      router.replace("/onboarding");
+    }
+    if (storedPhoto) {
+      setPhotoUrl(storedPhoto);
+    }
+  }, [router]);
 
-    const ratio = totalPossiblePoints > 0 ? earnedPointsToday / totalPossiblePoints : 0;
-    const streakBonus = Math.min(15, currentUser.currentStreak * 2);
+  // Map Convex data to local format
+  const user: UserProfile | null = convexUser ? {
+    id: convexUser._id,
+    name: convexUser.name,
+    ageRange: convexUser.ageRange,
+    gender: convexUser.gender,
+    weight: convexUser.weight,
+    category: convexUser.category,
+    goal: convexUser.goal,
+    stressLevel: convexUser.stressLevel,
+    sleepQuality: convexUser.sleepQuality,
+    meditationExperience: convexUser.meditationExperience,
+    anxietySource: convexUser.anxietySource,
+    activityLevel: convexUser.activityLevel,
+    exercisePerWeek: convexUser.exercisePerWeek,
+    exerciseType: convexUser.exerciseType,
+    avgSleepHours: convexUser.avgSleepHours,
+    dailyWaterLiters: convexUser.dailyWaterLiters,
+    weightGoal: convexUser.weightGoal,
+    auraLevel: convexUser.auraLevel,
+    currentStreak: convexUser.currentStreak,
+    longestStreak: convexUser.longestStreak,
+    photoUrl,
+    currentAuraImageUrl: convexUser.currentAuraImageUrl,
+    createdAt: convexUser.createdAt,
+  } : null;
 
-    return Math.min(100, Math.max(15, 15 + Math.round(ratio * 70) + streakBonus));
-  };
+  // Map habits with check-in status
+  const habits: Habit[] = (convexHabits || []).map((h) => ({
+    id: h._id,
+    title: h.title,
+    category: h.category,
+    isDefault: h.isDefault,
+    difficulty: h.difficulty,
+    auraPoints: h.auraPoints,
+    completedToday: todayCheckIns?.some((c) => c.habitId === h._id && c.completed) || false,
+  }));
 
-  const handleToggleHabit = (id: string) => {
-    if (!user) return;
-
-    const updated = habits.map((h) => {
-      if (h.id === id) {
-        return { ...h, completedToday: !h.completedToday };
-      }
-      return h;
-    });
-
-    setHabits(updated);
-    saveStoredHabits(updated);
-
-    const newAuraLevel = calculateAuraLevel(updated, user);
-    const updatedUser = { ...user, auraLevel: newAuraLevel };
-    setUser(updatedUser);
-    saveStoredUser(updatedUser);
+  const handleToggleHabit = async (id: string) => {
+    if (!userId) return;
+    const today = new Date().toISOString().split("T")[0];
+    try {
+      await toggleCheckIn({ userId: userId as any, habitId: id as any, date: today });
+    } catch (e) {
+      console.error("Error toggling habit:", e);
+    }
   };
 
   const handleReplaceHabit = async (id: string) => {
     if (!user || replacingId) return;
-
     const targetHabit = habits.find((h) => h.id === id);
     if (!targetHabit) return;
-
     setReplacingId(id);
 
     try {
@@ -104,104 +139,70 @@ export default function HomePage() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.title) {
-          const newHabit: Habit = {
-            id: `ai_rep_${Date.now()}`,
-            title: data.title,
-            category: user.category,
-            isDefault: false,
-            difficulty: data.difficulty || targetHabit.difficulty,
-            auraPoints: data.auraPoints || targetHabit.auraPoints,
-            completedToday: false,
-          };
-
-          const updated = habits.map((h) => (h.id === id ? newHabit : h));
-          setHabits(updated);
-          saveStoredHabits(updated);
-
-          const newAura = calculateAuraLevel(updated, user);
-          const updatedUser = { ...user, auraLevel: newAura };
-          setUser(updatedUser);
-          saveStoredUser(updatedUser);
+        if (data.title && userId) {
+          // Replace all habits (keep this one, replace the target)
+          const newHabits = habits.map((h) => {
+            if (h.id === id) {
+              return { title: data.title, category: user.category, difficulty: data.difficulty || targetHabit.difficulty, auraPoints: data.auraPoints || targetHabit.auraPoints };
+            }
+            return { title: h.title, category: h.category, difficulty: h.difficulty, auraPoints: h.auraPoints };
+          });
+          await replaceUserHabits({ userId: userId as any, habits: newHabits });
         }
       }
     } catch (e) {
-      console.error("Error al reemplazar hábito", e);
+      console.error("Error replacing habit", e);
     } finally {
       setReplacingId(null);
     }
   };
 
+  // Auto-regenerate AI habits if they're still defaults
   useEffect(() => {
-    const u = getStoredUser();
-    if (u && u.name) {
-      setUser(u);
-      const currentHabits = getStoredHabits(u.category);
-      setHabits(currentHabits);
+    if (!userId || !user || !convexHabits || convexHabits.length === 0) return;
 
-      // Auto-regenerate with AI if habits are static default ones or contain initial seed titles
-      const staticSeedKeywords = [
-        "meditar 5 minutos",
-        "escribir 3 cosas",
-        "leer 15 minutos",
-        "journaling",
-        "desconectar pantallas",
-        "tomar 2 litros",
-        "caminar 20 minutos",
-        "ejercicio activo",
-        "comer 1 comida",
-        "dormir entre 7 y 8",
-        "comer sin alimentos",
-      ];
+    const staticSeedKeywords = [
+      "meditar 5 minutos", "escribir 3 cosas", "leer 15 minutos",
+      "journaling", "desconectar pantallas", "tomar 2 litros",
+      "caminar 20 minutos", "ejercicio activo", "comer 1 comida",
+      "dormir entre 7 y 8", "comer sin alimentos",
+    ];
 
-      const isStaticDefault =
-        currentHabits.length === 0 ||
-        currentHabits.every((h) => h.isDefault === true) ||
-        currentHabits.some((h) =>
-          staticSeedKeywords.some((keyword) => h.title.toLowerCase().includes(keyword))
-        );
+    const isStaticDefault = convexHabits.every((h) => h.isDefault) ||
+      convexHabits.some((h) => staticSeedKeywords.some((k) => h.title.toLowerCase().includes(k)));
 
-      if (isStaticDefault) {
-        setIsGeneratingAiHabits(true);
-        fetch("/api/generate-futures", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: u, habitsCount: 5 }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
-              const aiHabits: Habit[] = data.habits.map((h: any, i: number) => ({
-                id: `ai_${Date.now()}_${i}`,
+    if (isStaticDefault) {
+      setIsGeneratingAiHabits(true);
+      fetch("/api/generate-futures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user, habitsCount: 5 }),
+      })
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
+            await replaceUserHabits({
+              userId: userId as any,
+              habits: data.habits.map((h: any) => ({
                 title: h.title || "",
-                category: u.category,
-                isDefault: false,
+                category: user.category,
                 difficulty: h.difficulty || "normal",
                 auraPoints: h.auraPoints || 8,
-                completedToday: false,
-              }));
-              setHabits(aiHabits);
-              saveStoredHabits(aiHabits);
-            }
-          })
-          .catch(() => {/* keep defaults on network error */})
-          .finally(() => {
-            setIsGeneratingAiHabits(false);
-          });
-      }
-    } else {
-      router.replace("/onboarding");
+              })),
+            });
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsGeneratingAiHabits(false));
     }
-  }, [router]);
+  }, [userId, user, convexHabits]);
 
-  // Handler for Modal 1: Updating Goal & Generating 5 AI Habits
   const handleSaveNewGoalAndHabits = async () => {
-    if (!newGoalInput.trim() || !user) return;
-
+    if (!newGoalInput.trim() || !user || !userId) return;
     setIsGeneratingGoalHabits(true);
-    const updatedUser: UserProfile = { ...user, goal: newGoalInput.trim() };
 
     try {
+      const updatedUser = { ...user, goal: newGoalInput.trim() };
       const res = await fetch("/api/generate-futures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -211,23 +212,16 @@ export default function HomePage() {
       if (res.ok) {
         const data = await res.json();
         if (data.habits && Array.isArray(data.habits) && data.habits.length > 0) {
-          const aiHabits: Habit[] = data.habits.map((h: any, i: number) => ({
-            id: `ai_goal_${Date.now()}_${i}`,
-            title: h.title || "",
-            category: user.category,
-            isDefault: false,
-            difficulty: h.difficulty || "normal",
-            auraPoints: h.auraPoints || 8,
-            completedToday: false,
-          }));
-
-          setHabits(aiHabits);
-          saveStoredHabits(aiHabits);
-
-          const newAura = calculateAuraLevel(aiHabits, updatedUser);
-          updatedUser.auraLevel = newAura;
+          await replaceUserHabits({
+            userId: userId as any,
+            habits: data.habits.map((h: any) => ({
+              title: h.title || "",
+              category: user.category,
+              difficulty: h.difficulty || "normal",
+              auraPoints: h.auraPoints || 8,
+            })),
+          });
         }
-
         if (data.darkFuture && data.brightFuture) {
           saveStoredFutures({
             darkFuture: data.darkFuture,
@@ -238,29 +232,18 @@ export default function HomePage() {
         }
       }
     } catch (e) {
-      console.error("Error al actualizar meta con IA", e);
+      console.error("Error updating goal with AI", e);
     } finally {
-      setUser(updatedUser);
-      saveStoredUser(updatedUser);
       setIsGeneratingGoalHabits(false);
       setShowGoalModal(false);
-
       try {
-        confetti({
-          particleCount: 60,
-          spread: 80,
-          origin: { y: 0.5 },
-          colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
-        });
-      } catch {
-        // fallback
-      }
+        confetti({ particleCount: 60, spread: 80, origin: { y: 0.5 }, colors: ["#7C3AED", "#06B6D4", "#F59E0B"] });
+      } catch {}
     }
   };
 
-  // Handler for Modal 2: Adding 1 Single Habit (AI or Manual)
   const handleGenerateSingleHabitWithAI = async () => {
-    if (!user) return;
+    if (!user || !userId) return;
     setIsGeneratingSingleHabit(true);
 
     try {
@@ -268,68 +251,41 @@ export default function HomePage() {
       const res = await fetch("/api/replace-habit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user,
-          targetDifficulty: habitDifficulty,
-          existingTitles,
-          oldHabitTitle: user.goal,
-        }),
+        body: JSON.stringify({ user, targetDifficulty: habitDifficulty, existingTitles, oldHabitTitle: user.goal }),
       });
 
       if (res.ok) {
         const data = await res.json();
         if (data.title) {
           const auraPoints = habitDifficulty === "easy" ? 5 : habitDifficulty === "normal" ? 8 : 12;
-          const newHabit: Habit = {
-            id: `ai_add_${Date.now()}`,
+          await createHabit({
+            userId: userId as any,
             title: data.title,
             category: user.category,
-            isDefault: false,
             difficulty: habitDifficulty,
             auraPoints,
-            completedToday: false,
-          };
-
-          const updated = [...habits, newHabit];
-          setHabits(updated);
-          saveStoredHabits(updated);
-
-          const newAura = calculateAuraLevel(updated, user);
-          const updatedUser = { ...user, auraLevel: newAura };
-          setUser(updatedUser);
-          saveStoredUser(updatedUser);
+          });
         }
       }
     } catch (e) {
-      console.error("Error al generar hábito único", e);
+      console.error("Error generating single habit", e);
     } finally {
       setIsGeneratingSingleHabit(false);
       setShowAddHabitModal(false);
     }
   };
 
-  const handleAddManualHabit = () => {
-    if (!customHabitTitle.trim() || !user) return;
-
+  const handleAddManualHabit = async () => {
+    if (!customHabitTitle.trim() || !user || !userId) return;
     const auraPoints = habitDifficulty === "easy" ? 5 : habitDifficulty === "normal" ? 8 : 12;
-    const newHabit: Habit = {
-      id: `man_${Date.now()}`,
+    
+    await createHabit({
+      userId: userId as any,
       title: customHabitTitle.trim(),
       category: user.category,
-      isDefault: false,
       difficulty: habitDifficulty,
       auraPoints,
-      completedToday: false,
-    };
-
-    const updated = [...habits, newHabit];
-    setHabits(updated);
-    saveStoredHabits(updated);
-
-    const newAura = calculateAuraLevel(updated, user);
-    const updatedUser = { ...user, auraLevel: newAura };
-    setUser(updatedUser);
-    saveStoredUser(updatedUser);
+    });
 
     setCustomHabitTitle("");
     setShowAddHabitModal(false);

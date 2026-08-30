@@ -3,7 +3,9 @@
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Check, Camera, Upload } from "lucide-react";
-import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile, Habit } from "@/lib/store";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { saveStoredFutures, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
 
@@ -161,6 +163,9 @@ const PHYSICAL_QUESTIONS: Question[] = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const createUser = useMutation(api.users.create);
+  const replaceHabits = useMutation(api.habits.replaceUserHabits);
+  const saveFutures = useMutation(api.twoFutures.save);
 
   // Onboarding Overall Phase:
   // 1: Perfil General, 2: Foto de Aura, 3: Categoría, 4: Meta, 5: Preguntas Step-by-Step, 6: Reveal
@@ -340,7 +345,6 @@ export default function OnboardingPage() {
               completedToday: false,
             }));
             setAiHabits(generatedHabits);
-            saveStoredHabits(generatedHabits);
           }
         })
         .catch((err) => console.error("API call error during onboarding", err))
@@ -360,26 +364,59 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFinishOnboarding = () => {
-    const userProfile: UserProfile = {
-      name,
-      ageRange,
-      gender,
-      weight,
-      category,
-      goal,
-      photoUrl,
-      auraLevel: calculatedAura,
-      currentStreak: 1,
-      longestStreak: 1,
-      createdAt: Date.now(),
-    };
+  const handleFinishOnboarding = async () => {
+    try {
+      // Create user in Convex (this seeds default habits)
+      const userId = await createUser({
+        name,
+        ageRange,
+        gender,
+        weight: weight || undefined,
+        category,
+        goal,
+      });
 
-    saveStoredUser(userProfile);
-    const habitsToSave = aiHabits.length > 0 ? aiHabits : getStoredHabits(category);
-    saveStoredHabits(habitsToSave);
+      // Store userId in localStorage for other pages to use
+      localStorage.setItem("aura_user_id", userId);
 
-    router.replace("/home");
+      // If AI habits were generated, replace the default ones
+      if (aiHabits.length > 0) {
+        await replaceHabits({
+          userId,
+          habits: aiHabits.map((h) => ({
+            title: h.title,
+            category: h.category,
+            difficulty: h.difficulty,
+            auraPoints: h.auraPoints,
+          })),
+        });
+      }
+
+      // Save photo URL to localStorage (Convex doesn't store base64 images)
+      if (photoUrl) {
+        localStorage.setItem("aura_user_photo", photoUrl);
+      }
+
+      router.replace("/home");
+    } catch (e) {
+      console.error("Error creating user in Convex:", e);
+      // Fallback to localStorage
+      const userProfile: UserProfile = {
+        name,
+        ageRange,
+        gender,
+        weight,
+        category,
+        goal,
+        photoUrl,
+        auraLevel: calculatedAura,
+        currentStreak: 1,
+        longestStreak: 1,
+        createdAt: Date.now(),
+      };
+      localStorage.setItem("aura_user_profile", JSON.stringify(userProfile));
+      router.replace("/home");
+    }
   };
 
   return (

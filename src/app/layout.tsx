@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, Space_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -48,9 +49,11 @@ export default function RootLayout({
       <ClerkProvider publishableKey={clerkPubKey}>
         <html lang="es" className={`${outfit.variable} ${spaceGrotesk.variable}`}>
           <body className="antialiased bg-[#0A0A1A] text-[#F8F8FF] min-h-screen flex flex-col justify-between select-none">
-            <main className="flex-1 max-w-md mx-auto w-full min-h-screen flex flex-col relative pb-20 overflow-x-hidden">
-              {children}
-            </main>
+            <ConvexClientProvider>
+              <main className="flex-1 max-w-md mx-auto w-full min-h-screen flex flex-col relative pb-20 overflow-x-hidden">
+                {children}
+              </main>
+            </ConvexClientProvider>
           </body>
         </html>
       </ClerkProvider>
@@ -60,9 +63,11 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${outfit.variable} ${spaceGrotesk.variable}`}>
       <body className="antialiased bg-[#0A0A1A] text-[#F8F8FF] min-h-screen flex flex-col justify-between select-none">
-        <main className="flex-1 max-w-md mx-auto w-full min-h-screen flex flex-col relative pb-20 overflow-x-hidden">
-          {children}
-        </main>
+        <ConvexClientProvider>
+          <main className="flex-1 max-w-md mx-auto w-full min-h-screen flex flex-col relative pb-20 overflow-x-hidden">
+            {children}
+          </main>
+        </ConvexClientProvider>
       </body>
     </html>
   );
