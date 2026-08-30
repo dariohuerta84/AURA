@@ -24,7 +24,34 @@ navegador (Vercel) → Convex (BD + storage + scheduler) → tunel → PC con GP
 
 ---
 
+## Estado actual (29 ago 2026)
+
+**Convex de produccion YA esta desplegado con el schema mergeado:**
+
+| | |
+| --- | --- |
+| URL | `https://amicable-curlew-70.convex.cloud` |
+| Proyecto | `frank-bendezu / aura` (deployment `production`) |
+| Dashboard | https://dashboard.convex.dev/t/frank-bendezu/aura/amicable-curlew-70 |
+
+Verificado: `npx convex run avatars:getLatestAvatar --prod` responde sin error.
+
+**Falta el eslabon 4**: no hay ninguna GPU sirviendo TripoSR, asi que
+`AVATAR_GPU_SERVICE_URL` no esta configurada. Consecuencia esperada: cada job
+termina en `status: "failed"` y el orbe muestra la foto del usuario en vez del
+modelo 3D, con un aviso discreto. La app funciona con normalidad.
+
+Para activar el 3D hace falta una maquina con GPU (ver mas abajo). La MX350 de
+2 GB de la PC de Frank Kevin no alcanza: TripoSR a `mc-resolution 256` pide
+bastante mas VRAM. Opciones reales: otra GPU con 6 GB o mas, `AVATAR_DEVICE=cpu`
+(varios minutos por avatar, con riesgo de que la accion de Convex expire), o
+`AVATAR_MOCK=1` para demostrar la cadena sin generacion real.
+
+---
+
 ## Paso 1 — Desplegar Convex (schema mergeado)
+
+*(Ya hecho para `amicable-curlew-70`. Repetir solo si se cambia `convex/`.)*
 
 Desde la raiz del proyecto, en la rama `el-aura`:
 
@@ -45,7 +72,7 @@ En el proyecto de Vercel, *Settings → Environment Variables*:
 
 | Variable | Valor |
 | --- | --- |
-| `NEXT_PUBLIC_CONVEX_URL` | la URL del paso 1 |
+| `NEXT_PUBLIC_CONVEX_URL` | `https://amicable-curlew-70.convex.cloud` |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | la clave de Clerk (opcional) |
 | `GOOGLE_API_KEY` | la clave de Gemini |
 
