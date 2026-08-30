@@ -23,6 +23,7 @@ export const createAvatarJob = mutation({
     const avatarId = await ctx.db.insert("avatars", {
       photoStorageId: args.photoStorageId,
       status: "pending",
+      createdAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.avatars.generateAvatar, {
       avatarId,
@@ -47,6 +48,22 @@ export const getAvatar = query({
   },
 });
 
+export const getLatestAvatar = query({
+  args: {},
+  handler: async (ctx) => {
+    const avatar = await ctx.db.query("avatars").order("desc").first();
+    if (!avatar) return null;
+    return {
+      _id: avatar._id,
+      status: avatar.status,
+      errorMessage: avatar.errorMessage,
+      meshUrl: avatar.meshStorageId
+        ? await ctx.storage.getUrl(avatar.meshStorageId)
+        : null,
+    };
+  },
+});
+
 // --- Internas (no se llaman desde el frontend) ---
 
 export const getAvatarInternal = internalQuery({
@@ -59,7 +76,7 @@ export const getAvatarInternal = internalQuery({
 export const setAvatarResult = internalMutation({
   args: {
     avatarId: v.id("avatars"),
-    status: v.union(v.literal("done"), v.literal("error")),
+    status: v.union(v.literal("completed"), v.literal("failed")),
     meshStorageId: v.optional(v.id("_storage")),
     errorMessage: v.optional(v.string()),
   },
@@ -68,13 +85,11 @@ export const setAvatarResult = internalMutation({
       status: args.status,
       meshStorageId: args.meshStorageId,
       errorMessage: args.errorMessage,
+      completedAt: Date.now(),
     });
   },
 });
 
-// 4. La acción: llama al servicio con GPU (túnel ngrok) y guarda el .glb
-// resultante en Convex storage. AVATAR_GPU_SERVICE_URL se configura con:
-//   npx convex env set AVATAR_GPU_SERVICE_URL https://xxxx.ngrok-free.app
 export const generateAvatar = internalAction({
   args: { avatarId: v.id("avatars") },
   handler: async (ctx, args) => {
@@ -82,7 +97,7 @@ export const generateAvatar = internalAction({
     if (!gpuServiceUrl) {
       await ctx.runMutation(internal.avatars.setAvatarResult, {
         avatarId: args.avatarId,
-        status: "error",
+        status: "failed",
         errorMessage:
           "Falta AVATAR_GPU_SERVICE_URL. Configúrala con: npx convex env set AVATAR_GPU_SERVICE_URL <url-de-ngrok>",
       });
@@ -98,7 +113,7 @@ export const generateAvatar = internalAction({
     if (!photoUrl) {
       await ctx.runMutation(internal.avatars.setAvatarResult, {
         avatarId: args.avatarId,
-        status: "error",
+        status: "failed",
         errorMessage: "No se pudo obtener la URL de la foto subida.",
       });
       return;
@@ -107,7 +122,11 @@ export const generateAvatar = internalAction({
     try {
       const response = await fetch(`${gpuServiceUrl}/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "bypass-tunnel-reminder": "true",
+          "User-Agent": "AuraConvex/1.0",
+        },
         body: JSON.stringify({ image_url: photoUrl }),
       });
 
@@ -120,13 +139,13 @@ export const generateAvatar = internalAction({
 
       await ctx.runMutation(internal.avatars.setAvatarResult, {
         avatarId: args.avatarId,
-        status: "done",
+        status: "completed",
         meshStorageId,
       });
     } catch (err) {
       await ctx.runMutation(internal.avatars.setAvatarResult, {
         avatarId: args.avatarId,
-        status: "error",
+        status: "failed",
         errorMessage: String(err),
       });
     }

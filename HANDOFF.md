@@ -1,18 +1,108 @@
-# AURA — Levantar el servicio GPU
+# AURA — Poner el avatar 3D en produccion
 
-## Estado actual del proyecto
+## Como esta armado ahora
 
-Todo está hecho **menos esto**. Concretamente:
+La rama `el-aura` contiene el merge de los tres trabajos: la app Next.js
+(Miluska), la integracion del orbe 3D (Matias) y la capa Convex + TripoSR
+(Frank Kevin). Es una sola historia de git, sin copiar y pegar.
 
-- Convex ya está desplegado y funcionando (proyecto `aura`, deployment
-  `giddy-eagle-383`): base de datos, storage, scheduler y estado reactivo.
-  Verificado de punta a punta.
-- El frontend ya está conectado a Convex y sube fotos correctamente.
-- **Falta un único dato**: la URL del servicio con GPU. Sin ella, cada avatar
-  termina en `status: "error"` con el mensaje "Falta AVATAR_GPU_SERVICE_URL".
-  Eso NO es un bug: es el sistema diciendo que le falta el brazo ejecutor.
+La cadena para que aparezca el avatar 3D tiene cuatro eslabones. Si falta
+cualquiera, la app funciona igual pero el orbe muestra la foto en vez del
+modelo 3D:
 
-Tu trabajo es solo levantar ese brazo. No toques `convex/` ni `frontend/`.
+```
+navegador (Vercel) → Convex (BD + storage + scheduler) → tunel → PC con GPU
+       ↑_____________ estado reactivo (useQuery) _____________|
+```
+
+| Eslabon | Quien lo hace | Como se verifica |
+| --- | --- | --- |
+| 1. Convex desplegado con el schema mergeado | quien administra el Convex | `npx convex env list --prod` responde |
+| 2. `NEXT_PUBLIC_CONVEX_URL` en Vercel | quien administra el Vercel | la app carga sin el error de la variable |
+| 3. `AVATAR_GPU_SERVICE_URL` en Convex | quien administra el Convex | `npx convex env list --prod` la muestra |
+| 4. Worker GPU corriendo + tunel abierto | quien tiene la GPU | `curl .../health` devuelve `cuda_available: true` |
+
+---
+
+## Estado actual (29 ago 2026)
+
+**Convex de produccion YA esta desplegado con el schema mergeado:**
+
+| | |
+| --- | --- |
+| URL | `https://amicable-curlew-70.convex.cloud` |
+| Proyecto | `frank-bendezu / aura` (deployment `production`) |
+| Dashboard | https://dashboard.convex.dev/t/frank-bendezu/aura/amicable-curlew-70 |
+
+Verificado: `npx convex run avatars:getLatestAvatar --prod` responde sin error.
+
+**Falta el eslabon 4**: no hay ninguna GPU sirviendo TripoSR, asi que
+`AVATAR_GPU_SERVICE_URL` no esta configurada. Consecuencia esperada: cada job
+termina en `status: "failed"` y el orbe muestra la foto del usuario en vez del
+modelo 3D, con un aviso discreto. La app funciona con normalidad.
+
+Para activar el 3D hace falta una maquina con GPU (ver mas abajo). La MX350 de
+2 GB de la PC de Frank Kevin no alcanza: TripoSR a `mc-resolution 256` pide
+bastante mas VRAM. Opciones reales: otra GPU con 6 GB o mas, `AVATAR_DEVICE=cpu`
+(varios minutos por avatar, con riesgo de que la accion de Convex expire), o
+`AVATAR_MOCK=1` para demostrar la cadena sin generacion real.
+
+---
+
+## Paso 1 — Desplegar Convex (schema mergeado)
+
+*(Ya hecho para `amicable-curlew-70`. Repetir solo si se cambia `convex/`.)*
+
+Desde la raiz del proyecto, en la rama `el-aura`:
+
+```bash
+npx convex deploy
+```
+
+Esto sube `convex/` entero: las tablas que ya existian (`users`, `habits`,
+`checkIns`, `twoFutures`, `auraSnapshots`) mas la tabla `avatars` y las
+funciones del avatar 3D. Es **aditivo**: no borra ni migra datos existentes.
+
+Al terminar imprime la URL del deployment de produccion
+(`https://xxxx.convex.cloud`). **Esa URL es la que va en el paso 2.**
+
+## Paso 2 — Configurar Vercel
+
+En el proyecto de Vercel, *Settings → Environment Variables*:
+
+| Variable | Valor |
+| --- | --- |
+| `NEXT_PUBLIC_CONVEX_URL` | `https://amicable-curlew-70.convex.cloud` |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | la clave de Clerk (opcional) |
+| `GOOGLE_API_KEY` | la clave de Gemini |
+
+Luego **Redeploy**. Es obligatorio: `NEXT_PUBLIC_*` se incrusta en el bundle
+durante el build, no se lee en runtime. Cambiar la variable sin redesplegar no
+tiene ningun efecto.
+
+Si `NEXT_PUBLIC_CONVEX_URL` falta, el build **falla a proposito** con un
+mensaje que lo dice. Antes caia en silencio a un tunel hardcodeado hacia una
+PC de desarrollo; eso ya no pasa.
+
+## Paso 3 — Conectar el worker GPU
+
+Con el worker ya corriendo y expuesto (pasos mas abajo), desde la raiz:
+
+```bash
+npx convex env set AVATAR_GPU_SERVICE_URL https://xxxx.ngrok-free.app --prod
+```
+
+No hace falta redesplegar nada: las Actions de Convex leen la variable en cada
+ejecucion. Si no esta, cada job termina en `status: "failed"` con el mensaje
+"Falta AVATAR_GPU_SERVICE_URL" — es el sistema avisando, no un bug.
+
+**La URL del tunel cambia cada vez que se reinicia** (en el plan gratis es
+aleatoria). Cada reinicio obliga a repetir este paso, o los avatares se quedan
+colgados sin explicacion aparente.
+
+---
+
+# Levantar el servicio GPU
 
 ## Por qué hace falta tu PC
 

@@ -1,19 +1,40 @@
 {
-  "name": "personaje-avatar-3d",
+  "name": "aura-app",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "description": "Avatar 3D desde foto: backend Django + TripoSR, capa Convex y servicio GPU.",
   "scripts": {
-    "convex:dev": "convex dev",
-    "convex:deploy": "convex deploy",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
   },
   "dependencies": {
-    "convex": "^1.45.0"
+    "@clerk/nextjs": "^7.8.3",
+    "@google-cloud/text-to-speech": "^7.0.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "@types/three": "^0.185.4",
+    "@google/genai": "^2.19.0",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "convex": "^1.45.0",
+    "lucide-react": "^1.37.0",
+    "next": "16.3.3",
+    "openai": "^7.8.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
-    "typescript": "^5.9.3"
+    "@tailwindcss/postcss": "^4",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
