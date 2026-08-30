@@ -121,3 +121,10 @@
   background: rgba(167, 139, 250, 0.3);
   border-radius: 4px;
 }
+
+/* Barra indeterminada mientras TripoSR genera la malla: el tiempo real varia
+   demasiado (descarga + GPU) como para mostrar un porcentaje honesto. */
+@keyframes barraCarga3D {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

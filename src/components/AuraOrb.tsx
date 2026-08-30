@@ -15,6 +15,16 @@ interface AuraOrbProps {
   meshUrl?: string;
   size?: "sm" | "md" | "lg";
   showDetails?: boolean;
+  /** Hay un job de avatar 3D en curso: muestra la linea de carga. */
+  loading3D?: boolean;
+  /** Etapa actual, debajo de la linea de carga. */
+  loading3DLabel?: string;
+  /**
+   * Si no hay meshUrl propio, usar el ultimo avatar generado. Sirve en /home,
+   * pero en onboarding hay que desactivarlo: ahi seguimos un job concreto y
+   * caer al ultimo global mostraria el avatar de otra persona.
+   */
+  useLatestAvatarFallback?: boolean;
 }
 
 export const AuraOrb: React.FC<AuraOrbProps> = ({
@@ -24,8 +34,14 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
   meshUrl,
   size = "md",
   showDetails = true,
+  loading3D = false,
+  loading3DLabel = "Generando avatar 3D...",
+  useLatestAvatarFallback = true,
 }) => {
-  const latestAvatar = useQuery(api.avatars.getLatestAvatar);
+  const latestAvatar = useQuery(
+    api.avatars.getLatestAvatar,
+    useLatestAvatarFallback ? {} : "skip"
+  );
   const activeMeshUrl = meshUrl || latestAvatar?.meshUrl;
 
   const tier = useMemo(() => {
@@ -92,6 +108,17 @@ export const AuraOrb: React.FC<AuraOrbProps> = ({
           )}
         </div>
       </div>
+
+      {loading3D && (
+        <div className="mt-4 flex flex-col items-center gap-2 w-48">
+          <div className="w-full h-1.5 rounded-full bg-white/10 border border-white/10 overflow-hidden backdrop-blur-md">
+            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-purple-500 via-cyan-400 to-amber-400 shadow-[0_0_12px_rgba(124,58,237,0.9)] animate-[barraCarga3D_1.5s_ease-in-out_infinite]" />
+          </div>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-cyan-300/90 text-center">
+            {loading3DLabel}
+          </span>
+        </div>
+      )}
 
       {showDetails && (
         <div className="mt-4 flex flex-col items-center gap-1.5">
