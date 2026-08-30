@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Flame, Trophy, Calendar, Sparkles, RefreshCw, Zap, Award } from "lucide-react";
+import { Flame, Trophy, Calendar, Sparkles, RefreshCw, Zap, Award, LogOut } from "lucide-react";
 import { getStoredUser, getStoredHabits, saveStoredUser, UserProfile, Habit } from "@/lib/store";
 import { BottomNav } from "@/components/BottomNav";
 import { SignInButton, UserButton, useUser, useClerk } from "@clerk/nextjs";
@@ -59,6 +59,26 @@ function ClerkAccountSection({ user, handleResetProfile }: { user: UserProfile; 
 
 export default function ProfilePage() {
   const router = useRouter();
+
+  let signOut: any = null;
+  try {
+    signOut = useClerk().signOut;
+  } catch {
+    // Clerk not configured
+  }
+
+  const handleLogout = async () => {
+    if (confirm("¿Deseas cerrar sesión y reiniciar la sesión en este dispositivo?")) {
+      localStorage.clear();
+      try {
+        if (signOut) await signOut();
+      } catch {
+        // fallback
+      }
+      router.replace("/");
+    }
+  };
+
   const [user, setUser] = useState<UserProfile | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
 
@@ -217,6 +237,16 @@ export default function ProfilePage() {
             <span className="text-[10px] text-white/50 uppercase font-semibold">Logros Hoy</span>
           </div>
         </div>
+
+        {/* Logout / Reset Button */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full py-3.5 px-4 rounded-2xl glass-card border border-red-500/30 hover:border-red-500/60 text-red-400 font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:bg-red-950/20 mt-2"
+        >
+          <LogOut className="w-4 h-4 text-red-400" />
+          <span>Cerrar Sesión / Reiniciar Perfil</span>
+        </button>
       </div>
 
       {/* Bottom PWA Nav */}

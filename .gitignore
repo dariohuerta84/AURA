@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-node_modules
+node_modules/
+
 /.pnp
 .pnp.*
 .yarn/*
@@ -17,8 +18,9 @@ node_modules
 /.next/
 /out/
 
-# production
+# build / dist (Next y el visor Vite)
 /build
+dist/
 
 # misc
 .DS_Store
@@ -32,6 +34,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -40,3 +43,23 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 gcp-sa-key-base64.txt
+
+# --- Python / servicio GPU ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.venv-*/
+
+# TripoSR se clona aparte dentro de gpu_service/ (ver HANDOFF.md)
+/gpu_service/TripoSR/
+
+# artefactos generados por el worker GPU: no van a git
+/gpu_service/gpu_service_output/
+
+# --- Django muerto (eliminado, no volver a commitear) ---
+/backend/
+
+# artefactos de prueba del worker GPU (mock_avatar.glb SI se versiona)
+/gpu_service/test_server_output.glb
+/gpu_service/valid_avatar.glb

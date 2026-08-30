@@ -6,8 +6,9 @@ import { Sparkles, Brain, Activity, ArrowRight, ShieldCheck, Zap, HeartPulse, Ch
 import { saveStoredUser, saveStoredHabits, saveStoredFutures, getStoredHabits, UserProfile, Habit } from "@/lib/store";
 import { AuraOrb } from "@/components/AuraOrb";
 import confetti from "canvas-confetti";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type Question = {
   id: string;
@@ -230,35 +231,47 @@ export default function OnboardingPage() {
 
   const generateUploadUrl = useMutation(api.avatars.generateUploadUrl);
   const createAvatarJob = useMutation(api.avatars.createAvatarJob);
-  const [is3DGenerating, setIs3DGenerating] = useState(false);
+
+  // Job del avatar 3D. useQuery es reactivo: Convex empuja el cambio de estado
+  // solo, sin polling ni recargar la pagina.
+  const [avatarJobId, setAvatarJobId] = useState<Id<"avatars"> | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorSubida, setErrorSubida] = useState(false);
+  const avatarJob = useQuery(
+    api.avatars.getAvatar,
+    avatarJobId ? { avatarId: avatarJobId } : "skip"
+  );
+
+  const mesh3DUrl =
+    avatarJob?.status === "completed" ? avatarJob.meshUrl ?? undefined : undefined;
+  const generando3D = subiendoFoto || avatarJob?.status === "pending";
+  const fallo3D = errorSubida || avatarJob?.status === "failed";
+  const etiqueta3D = subiendoFoto ? "Subiendo foto..." : "Generando avatar 3D...";
 
   const uploadPhotoToConvex = async (blob: Blob) => {
     try {
-      setIs3DGenerating(true);
-      let uploadUrl = await generateUploadUrl();
-      if (typeof window !== "undefined") {
-        if (uploadUrl.includes("127.0.0.1:3212") || uploadUrl.includes("localhost:3212")) {
-          uploadUrl = uploadUrl.replace("http://127.0.0.1:3212", "https://tangy-clouds-grab.loca.lt").replace("http://localhost:3212", "https://tangy-clouds-grab.loca.lt");
-        }
-      }
-      if (uploadUrl.includes("loca.lt") && !uploadUrl.includes("bypass-tunnel-reminder")) {
-        uploadUrl += (uploadUrl.includes("?") ? "&" : "?") + "bypass-tunnel-reminder=true";
-      }
+      setSubiendoFoto(true);
+      setAvatarJobId(null);
+      setErrorSubida(false);
+
+      const uploadUrl = await generateUploadUrl();
 
       const res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": "image/jpeg", "Bypass-Tunnel-Remainder": "true" },
+        headers: { "Content-Type": "image/jpeg" },
         body: blob,
       });
+      if (!res.ok) throw new Error(`La subida a Convex respondio ${res.status}`);
 
-      if (res.ok) {
-        const { storageId } = await res.json();
-        await createAvatarJob({ photoStorageId: storageId });
-      }
+      const { storageId } = await res.json();
+      const jobId = await createAvatarJob({ photoStorageId: storageId });
+      setAvatarJobId(jobId);
     } catch (err) {
       console.error("Error triggering 3D avatar job:", err);
+      setErrorSubida(true);
     } finally {
-      setIs3DGenerating(false);
+      // Solo termina la subida; la generacion sigue y la reporta avatarJob.
+      setSubiendoFoto(false);
     }
   };
 
@@ -385,23 +398,23 @@ export default function OnboardingPage() {
               completedToday: false,
             }));
             setAiHabits(generatedHabits);
+            saveStoredHabits(generatedHabits);
           }
         })
-        .catch((err) => console.error("API call error during onboarding", err));
-
-      setTimeout(() => {
-        setIsGenerating(false);
-        try {
-          confetti({
-            particleCount: 75,
-            spread: 80,
-            origin: { y: 0.6 },
-            colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
-          });
-        } catch {
-          // fallback
-        }
-      }, 2400);
+        .catch((err) => console.error("API call error during onboarding", err))
+        .finally(() => {
+          setIsGenerating(false);
+          try {
+            confetti({
+              particleCount: 75,
+              spread: 80,
+              origin: { y: 0.6 },
+              colors: ["#7C3AED", "#06B6D4", "#F59E0B"],
+            });
+          } catch {
+            // fallback
+          }
+        });
     }
   };
 
@@ -584,7 +597,17 @@ export default function OnboardingPage() {
                 <div className="absolute inset-0 border-2 border-white/20 rounded-full pointer-events-none" />
               </div>
             ) : (
-              <AuraOrb auraLevel={75} streak={1} photoUrl={photoUrl} size="lg" showDetails={false} />
+              <AuraOrb
+                auraLevel={75}
+                streak={1}
+                photoUrl={photoUrl}
+                meshUrl={mesh3DUrl}
+                loading3D={generando3D}
+                loading3DLabel={etiqueta3D}
+                useLatestAvatarFallback={false}
+                size="lg"
+                showDetails={false}
+              />
             )}
           </div>
 
@@ -640,6 +663,13 @@ export default function OnboardingPage() {
               </>
             )}
           </div>
+
+          {fallo3D && (
+            <p className="text-[10px] text-white/50 max-w-xs text-center leading-relaxed">
+              No se pudo generar el avatar 3D esta vez. Tu foto se guardo igual y
+              puedes continuar; el orbe la usara mientras tanto.
+            </p>
+          )}
         </div>
       )}
 
@@ -803,7 +833,17 @@ export default function OnboardingPage() {
               </div>
 
               {/* Glowing Aura Orb displaying the calculated Aura and User Photo */}
-              <AuraOrb auraLevel={calculatedAura} streak={1} photoUrl={photoUrl} size="lg" showDetails={true} />
+              <AuraOrb
+                auraLevel={calculatedAura}
+                streak={1}
+                photoUrl={photoUrl}
+                meshUrl={mesh3DUrl}
+                loading3D={generando3D}
+                loading3DLabel={etiqueta3D}
+                useLatestAvatarFallback={false}
+                size="lg"
+                showDetails={true}
+              />
 
               <p className="text-xs text-white/70 max-w-xs leading-relaxed my-1">
                 Tu evaluación de {category === "salud_mental" ? "Salud Emocional" : "Salud Física"} determinó tu aura inicial en nivel <strong className="text-purple-300 font-bold">{calculatedAura} / 100</strong>. Cada hábito que cumplas elevará tu energía.

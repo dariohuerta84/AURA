@@ -21,21 +21,23 @@ export const FutureScene: React.FC<FutureSceneProps> = ({
 
   const fullText = activeTab === "dark" ? darkFuture : brightFuture;
 
-  // Typewriter effect
+  // Typewriter effect using slice to guarantee 100% exact text rendering without word clipping
   useEffect(() => {
     setDisplayedText("");
-    let index = 0;
+    let currentLength = 0;
     const interval = setInterval(() => {
-      if (index < fullText.length) {
-        setDisplayedText((prev) => prev + fullText.charAt(index));
-        index++;
+      currentLength++;
+      if (currentLength <= fullText.length) {
+        setDisplayedText(fullText.slice(0, currentLength));
       } else {
         clearInterval(interval);
       }
-    }, 22);
+    }, 18);
 
     return () => clearInterval(interval);
   }, [fullText]);
+
+
 
   // Google Cloud TTS (with Web Speech fallback via useTts hook)
   const toggleSpeech = () => {

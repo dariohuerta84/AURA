@@ -1,0 +1,9 @@
+# Normaliza finales de linea: tu trabajas en Windows y tu companero puede
+# estar en Linux. Sin esto, cada commit cambia el archivo entero por CRLF.
+* text=auto eol=lf
+
+# Binarios: que git no intente convertirlos.
+*.png binary
+*.jpeg binary
+*.jpg binary
+*.glb binary

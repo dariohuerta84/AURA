@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 export async function POST(req: Request) {
   try {
@@ -9,27 +11,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan datos requeridos (usuario y dificultad)" }, { status: 400 });
     }
 
-    const googleApiKey = process.env.GOOGLE_API_KEY;
     const auraPoints = targetDifficulty === "easy" ? 5 : targetDifficulty === "normal" ? 8 : 12;
-
-    if (!googleApiKey) {
-      // Fallback if API key missing
-      const fallbacks: Record<string, string[]> = {
-        easy: ["Beber 1 vaso de agua al despertar", "Realizar 3 estiramientos suaves", "Anotar 1 pensamiento positivo"],
-        normal: ["Leer 10 páginas de un libro", "Caminata de 15 minutos sin teléfono", "Planificar 3 tareas clave del día"],
-        hard: ["Escribir un resumen del día sin pantallas", "Entrenamiento intenso de 20 min", "Ducha de agua fría por 60 seg"],
-      };
-
-      const options = fallbacks[targetDifficulty] || fallbacks.normal;
-      const unused = options.filter((title) => !existingTitles.includes(title));
-      const chosenTitle = unused[0] || `Nuevo hábito de ${targetDifficulty}`;
-
-      return NextResponse.json({
-        title: chosenTitle,
-        difficulty: targetDifficulty,
-        auraPoints,
-      });
-    }
+    const openCodeKey = process.env.OPENCODE_API_KEY;
+    const googleApiKey = process.env.GOOGLE_API_KEY;
 
     const prompt = `Eres el coach de hábitos IA de la app AURA (neuropsicología y hábitos atómicos).
 El usuario quiere reemplazar uno de sus hábitos por uno totalmente nuevo y fresco.
@@ -56,57 +40,86 @@ Responde EXCLUSIVAMENTE con este formato JSON válido:
   "auraPoints": ${auraPoints}
 }`;
 
-    let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${googleApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.85,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    // 1. Try OpenCode (MiMo V2.5 Free) if key present
+    if (openCodeKey) {
+      try {
+        const openai = new OpenAI({
+          apiKey: openCodeKey,
+          baseURL: process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1",
+        });
 
-    if (!response.ok) {
-      // Fallback model if primary endpoint hiccups
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.85,
-              responseMimeType: "application/json",
-            },
-          }),
+        const completion = await openai.chat.completions.create({
+          model: process.env.OPENCODE_MODEL || "mimo-v2.5-free",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.85,
+        });
+
+        const content = completion.choices[0]?.message?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          if (parsed.title) {
+            return NextResponse.json({
+              title: parsed.title,
+              difficulty: targetDifficulty,
+              auraPoints,
+            });
+          }
         }
-      );
+      } catch (e) {
+        console.error("[Replace Habit OpenCode Error]:", e);
+      }
     }
 
-    if (response.ok) {
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (rawText) {
-        const parsed = JSON.parse(rawText);
-        if (parsed.title) {
-          return NextResponse.json({
-            title: parsed.title,
-            difficulty: targetDifficulty,
-            auraPoints,
+    // 2. Try Gemini SDK if key present (fallback)
+    if (googleApiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: googleApiKey });
+        let rawText = "";
+
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: prompt,
           });
+          rawText = response.text?.trim() || "";
+        } catch {
+          const fallbackRes = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: prompt,
+          });
+          rawText = fallbackRes.text?.trim() || "";
         }
+
+        if (rawText) {
+          const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+          const parsed = JSON.parse(cleaned);
+          if (parsed.title) {
+            return NextResponse.json({
+              title: parsed.title,
+              difficulty: targetDifficulty,
+              auraPoints,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[Replace Habit Gemini Error]:", e);
       }
     }
 
-    // Fallback response if AI parse fails
+    // Fallback if API keys missing/failing
+    const fallbacks: Record<string, string[]> = {
+      easy: ["Beber 1 vaso de agua al despertar", "Realizar 3 estiramientos suaves", "Anotar 1 pensamiento positivo"],
+      normal: ["Leer 10 páginas de un libro", "Caminata de 15 minutos sin teléfono", "Planificar 3 tareas clave del día"],
+      hard: ["Escribir un resumen del día sin pantallas", "Entrenamiento intenso de 20 min", "Ducha de agua fría por 60 seg"],
+    };
+
+    const options = fallbacks[targetDifficulty] || fallbacks.normal;
+    const unused = options.filter((title) => !existingTitles.includes(title));
+    const chosenTitle = unused[0] || `Nuevo hábito de ${targetDifficulty}`;
+
     return NextResponse.json({
-      title: `Practicar 5 min de enfoque hacia "${user.goal}"`,
+      title: chosenTitle,
       difficulty: targetDifficulty,
       auraPoints,
     });
